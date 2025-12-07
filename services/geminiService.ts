@@ -30,24 +30,30 @@ const SYSTEM_PROMPT = `
 - Используй Markdown.
 `;
 
+const getClient = () => {
+  if (!process.env.API_KEY) {
+    throw new Error("API Key is missing in environment variables.");
+  }
+  const config: any = { apiKey: process.env.API_KEY };
+  if (process.env.BASE_URL) {
+    config.baseUrl = process.env.BASE_URL;
+  }
+  return new GoogleGenAI(config);
+};
+
 export const analyzeLabel = async (
   labelBase64: string,
   labelMimeType: string,
   excelText: string
 ): Promise<string> => {
-  
-  if (!process.env.API_KEY) {
-    throw new Error("API Key is missing in environment variables.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getClient();
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       config: {
         systemInstruction: SYSTEM_PROMPT,
-        temperature: 0.2, // Low temperature for factual proofreading
+        temperature: 0.2,
       },
       contents: {
         parts: [
@@ -66,7 +72,54 @@ export const analyzeLabel = async (
 
     return response.text || "Не удалось получить результат анализа.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    throw new Error("Произошла ошибка при анализе данных. Проверьте файлы и повторите попытку.");
+    console.error("Gemini API Error (Text Analysis):", error);
+    throw new Error("Произошла ошибка при анализе текста. Проверьте файлы и ключ API.");
+  }
+};
+
+export const generateAnnotatedLabel = async (
+  labelBase64: string,
+  labelMimeType: string,
+  analysisReport: string
+): Promise<string | undefined> => {
+  const ai = getClient();
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image', // Using the image generation/edit model
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: labelMimeType,
+              data: labelBase64,
+            },
+          },
+          {
+            text: `Это изображение этикетки продукта. 
+            Были найдены следующие ошибки (см. ниже).
+            Пожалуйста, верни это же изображение, но НАРИСУЙ на нем красные линии/круги/стрелки, указывающие на места этих ошибок. Сделай это в стиле инфографики.
+            
+            Список ошибок для визуализации:
+            ${analysisReport.substring(0, 1000)}... (сокращено)
+            `,
+          },
+        ],
+      },
+    });
+
+    // Extract the image from response
+    if (response.candidates?.[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+         if (part.inlineData && part.inlineData.data) {
+             return part.inlineData.data;
+         }
+      }
+    }
+    return undefined;
+  } catch (error) {
+    console.error("Gemini API Error (Image Annotation):", error);
+    // Warning only, don't fail the whole process if annotation fails
+    return undefined;
   }
 };

@@ -6,8 +6,9 @@ export interface FileData {
   type: 'label' | 'excel';
 }
 
-export interface AnalysisResult {
+export interface AnalysisResultData {
   markdown: string;
+  annotatedImageUrl?: string;
 }
 
 export interface DragDropProps {

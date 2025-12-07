@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { Scan, Sparkles, ArrowRight, RefreshCw, AlertTriangle } from 'lucide-react';
 import Dropzone from './components/Dropzone';
 import AnalysisResult from './components/AnalysisResult';
-import { FileData } from './types';
+import { FileData, AnalysisResultData } from './types';
 import { fileToBase64, parseExcelFile, createPreviewUrl } from './utils/fileHelpers';
-import { analyzeLabel } from './services/geminiService';
+import { analyzeLabel, generateAnnotatedLabel } from './services/geminiService';
 
 const App: React.FC = () => {
   const [labelFile, setLabelFile] = useState<FileData | null>(null);
   const [excelFile, setExcelFile] = useState<FileData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [loadingStage, setLoadingStage] = useState<string>("");
+  const [result, setResult] = useState<AnalysisResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleLabelSelect = async (file: File) => {
@@ -51,21 +52,34 @@ const App: React.FC = () => {
     setError(null);
 
     try {
-      // Prepare label data
       const labelBase64 = await fileToBase64(labelFile.file);
       
-      // Perform analysis
+      // Stage 1: Text Analysis
+      setLoadingStage("Сверяем текст с таблицей...");
       const analysisText = await analyzeLabel(
         labelBase64,
         labelFile.file.type,
         excelFile.content || ""
       );
 
-      setResult(analysisText);
+      // Stage 2: Image Annotation
+      setLoadingStage("Создаем карту ошибок...");
+      const annotatedImage = await generateAnnotatedLabel(
+        labelBase64,
+        labelFile.file.type,
+        analysisText
+      );
+
+      setResult({
+        markdown: analysisText,
+        annotatedImageUrl: annotatedImage
+      });
+
     } catch (err: any) {
       setError(err.message || "Произошла ошибка при анализе.");
     } finally {
       setIsAnalyzing(false);
+      setLoadingStage("");
     }
   };
 
@@ -77,7 +91,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
       
       {/* Header */}
       <header className="max-w-4xl w-full text-center mb-12">
@@ -94,18 +108,19 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-5xl w-full space-y-8">
+      <main className="max-w-6xl w-full space-y-8">
         
         {/* Error Banner */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 animate-fade-in">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 animate-fade-in max-w-3xl mx-auto">
             <AlertTriangle size={20} />
             <p>{error}</p>
           </div>
         )}
 
-        {/* Upload Section */}
-        <div className="grid md:grid-cols-2 gap-6 relative">
+        {/* Upload Section - Hidden when showing results to save space, or can stay if preferred. Let's keep it but maybe simplified if result exists. For now, standard behavior. */}
+        {!result && (
+        <div className="grid md:grid-cols-2 gap-6 relative max-w-5xl mx-auto">
           
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider ml-1">1. Изображение этикетки</h2>
@@ -138,10 +153,11 @@ const App: React.FC = () => {
              <ArrowRight className="text-gray-400" size={20} />
           </div>
         </div>
+        )}
 
         {/* Action Button */}
+        {!result && (
         <div className="flex justify-center pt-4">
-          {!result ? (
             <button
               onClick={handleAnalyze}
               disabled={!labelFile || !excelFile || isAnalyzing}
@@ -158,7 +174,7 @@ const App: React.FC = () => {
               {isAnalyzing ? (
                 <>
                   <RefreshCw className="animate-spin" size={20} />
-                  Сканирование и анализ...
+                  {loadingStage || "Анализ..."}
                 </>
               ) : (
                 <>
@@ -167,16 +183,21 @@ const App: React.FC = () => {
                 </>
               )}
             </button>
-          ) : (
+        </div>
+        )}
+
+        {/* Show Reset Button when result is visible */}
+        {result && (
+          <div className="flex justify-center mb-8">
             <button
               onClick={handleReset}
               className="px-6 py-3 rounded-full bg-white border border-gray-200 text-slate-600 font-medium hover:bg-gray-50 hover:text-slate-900 transition-colors shadow-sm flex items-center gap-2"
             >
               <RefreshCw size={18} />
-              Начать заново
+              Загрузить новые файлы
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Scanning Overlay Effect */}
         {isAnalyzing && labelFile && (
@@ -189,16 +210,16 @@ const App: React.FC = () => {
                     )}
                     <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/20 to-transparent animate-scan h-full"></div>
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Анализ данных</h3>
-                <p className="text-gray-500">Сравниваем текст этикетки с таблицей, ищем ошибки и несоответствия...</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Идет проверка</h3>
+                <p className="text-gray-500 text-sm">{loadingStage}</p>
              </div>
            </div>
         )}
 
         {/* Results Section */}
         {result && (
-          <div className="pt-8 animate-fade-in pb-20">
-            <AnalysisResult content={result} />
+          <div className="animate-fade-in pb-20">
+            <AnalysisResult data={result} />
           </div>
         )}
 
