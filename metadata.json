@@ -1,0 +1,5 @@
+{
+  "name": "LabelCheck AI",
+  "description": "An AI-powered tool to proofread product labels against source Excel data, identifying discrepancies, typos, and formatting errors.",
+  "requestFramePermissions": []
+}
