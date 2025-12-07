@@ -30,14 +30,52 @@ const SYSTEM_PROMPT = `
 - Используй Markdown.
 `;
 
+// Helper to get safe string from env
+const getEnvVar = (key: string): string => {
+  // @ts-ignore
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    // @ts-ignore
+    return process.env[key];
+  }
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+    // @ts-ignore
+    return import.meta.env[key];
+  }
+  return '';
+};
+
 const getClient = () => {
-  if (!process.env.API_KEY) {
-    throw new Error("API Key is missing in environment variables.");
+  const apiKey = getEnvVar('API_KEY');
+  const baseUrlEnv = getEnvVar('BASE_URL');
+
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please check your Railway variables.");
   }
-  const config: any = { apiKey: process.env.API_KEY };
-  if (process.env.BASE_URL) {
-    config.baseUrl = process.env.BASE_URL;
+
+  const config: any = { apiKey: apiKey };
+
+  // Handle Custom Base URL (e.g., Artemox)
+  if (baseUrlEnv) {
+    // Remove trailing slashes and version suffixes (v1/v1beta) as SDK handles versions
+    let cleanUrl = baseUrlEnv.replace(/\/$/, ""); 
+    
+    // Some custom proxies require the exact URL provided in the docs.
+    // If the provider specifically said "https://api.artemox.com", we use that.
+    if (cleanUrl.includes("/v1")) {
+       cleanUrl = cleanUrl.replace("/v1", "");
+    }
+    
+    config.baseUrl = cleanUrl;
   }
+  
+  // Custom headers for 'sk-' keys if needed by specific proxies that mimic OpenAI
+  if (apiKey.startsWith('sk-')) {
+    config.customHeaders = {
+      'Authorization': `Bearer ${apiKey}`
+    };
+  }
+
   return new GoogleGenAI(config);
 };
 
@@ -50,7 +88,7 @@ export const analyzeLabel = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash-lite', // Updated to model supported by Artemox
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
@@ -71,9 +109,11 @@ export const analyzeLabel = async (
     });
 
     return response.text || "Не удалось получить результат анализа.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error (Text Analysis):", error);
-    throw new Error("Произошла ошибка при анализе текста. Проверьте файлы и ключ API.");
+    let errorMsg = "Произошла ошибка при анализе текста.";
+    if (error.message) errorMsg += ` (${error.message})`;
+    throw new Error(errorMsg);
   }
 };
 
@@ -86,7 +126,7 @@ export const generateAnnotatedLabel = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Using the image generation/edit model
+      model: 'gemini-2.5-flash-image', // Using the image model available in your list
       contents: {
         parts: [
           {
@@ -97,12 +137,10 @@ export const generateAnnotatedLabel = async (
           },
           {
             text: `Это изображение этикетки продукта. 
-            Были найдены следующие ошибки (см. ниже).
-            Пожалуйста, верни это же изображение, но НАРИСУЙ на нем красные линии/круги/стрелки, указывающие на места этих ошибок. Сделай это в стиле инфографики.
+            Были найдены следующие ошибки:
+            ${analysisReport.substring(0, 500)}...
             
-            Список ошибок для визуализации:
-            ${analysisReport.substring(0, 1000)}... (сокращено)
-            `,
+            Верни это же изображение, но НАРИСУЙ на нем красные обводки/стрелки в местах ошибок.`,
           },
         ],
       },
@@ -119,7 +157,6 @@ export const generateAnnotatedLabel = async (
     return undefined;
   } catch (error) {
     console.error("Gemini API Error (Image Annotation):", error);
-    // Warning only, don't fail the whole process if annotation fails
     return undefined;
   }
 };

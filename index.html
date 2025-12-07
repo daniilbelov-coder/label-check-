@@ -4,7 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LabelCheck AI - Умная проверка этикеток</title>
-    <!-- We keep Tailwind CDN for simplicity to avoid setting up PostCSS file -->
+    
+    <!-- Safety Shim: Ensures process.env exists in browser to prevent crashes if Vite doesn't inject it yet -->
+    <script>
+      window.process = { env: {} };
+    </script>
+
+    <!-- Tailwind CSS (CDN for guaranteed styling) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -12,8 +18,8 @@
           extend: {
             colors: {
               primary: '#000000',
-              secondary: '#3B82F6', // Blue-500
-              accent: '#EFF6FF', // Blue-50
+              secondary: '#3B82F6', 
+              accent: '#EFF6FF',
             },
             animation: {
               'scan': 'scan 2s linear infinite',
