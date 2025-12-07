@@ -1,9 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
-// Artemox.com proxy credentials (Gemini API without VPN)
-const DEFAULT_API_KEY = "sk-q__BVWFUdOxIdfAf6pWnrg";
-const BASE_URL = "https://api.artemox.com";
-
 const SYSTEM_PROMPT = `
 Ты — СТРОГИЙ АЛГОРИТМ КОНТРОЛЯ КАЧЕСТВА (QA). Твоя цель — найти АБСОЛЮТНО ВСЕ различия между исходным текстом и этикеткой. Ты не "креативный корректор", ты "diff-checker".
 
@@ -42,63 +36,72 @@ const SYSTEM_PROMPT = `
 - В конце отдельным блоком: "Орфография и пунктуация".
 `;
 
-const getClient = () => {
-  // Use environment variable if available, otherwise fall back to default
-  const envKey = process.env.API_KEY;
-  const apiKey = (envKey && envKey.length > 0 && envKey !== 'undefined') ? envKey : DEFAULT_API_KEY;
-
-  if (!apiKey) {
-    console.error("API Key missing.");
-    throw new Error("API Key is missing. Please check your environment configuration.");
-  }
-
-  // Initialize with Artemox proxy endpoint (works without VPN)
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: { baseUrl: BASE_URL }
-  });
-};
-
 export const analyzeLabel = async (
   labelBase64: string,
   labelMimeType: string,
   excelText: string
 ): Promise<string> => {
-  const ai = getClient();
-
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        temperature: 0.0,
+    // Build OpenAI-compatible message format with image
+    const messages = [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT,
       },
-      contents: {
-        parts: [
+      {
+        role: 'user',
+        content: [
           {
-            inlineData: {
-              mimeType: labelMimeType,
-              data: labelBase64,
+            type: 'image_url',
+            image_url: {
+              url: `data:${labelMimeType};base64,${labelBase64}`,
             },
           },
           {
+            type: 'text',
             text: `ЭТАЛОН (EXCEL):\n${excelText}\n\nСравни это с изображением. Будь педантичен к регистру букв.`,
           },
         ],
       },
+    ];
+
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gemini-2.5-flash',
+        messages,
+        temperature: 0,
+      }),
     });
 
-    return response.text || "Не удалось получить результат анализа.";
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.details || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Extract text from OpenAI-compatible response format
+    const resultText = data.choices?.[0]?.message?.content;
+    
+    if (!resultText) {
+      throw new Error('Empty response from API');
+    }
+
+    return resultText;
   } catch (error: any) {
-    console.error("Gemini API Error (Text Analysis):", error);
+    console.error("API Error (Text Analysis):", error);
     let errorMsg = "Произошла ошибка при анализе текста.";
     
     if (error.message?.includes("403")) {
-        errorMsg += " (Ошибка доступа/API Key неверный).";
+      errorMsg += " (Ошибка доступа/API Key неверный).";
     } else if (error.message?.includes("429")) {
-        errorMsg += " (Слишком много запросов, попробуйте позже).";
+      errorMsg += " (Слишком много запросов, попробуйте позже).";
     } else if (error.message) {
-        errorMsg += ` (${error.message})`;
+      errorMsg += ` (${error.message})`;
     }
     
     throw new Error(errorMsg);
