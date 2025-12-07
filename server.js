@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 4173;
+const PORT = process.env.PORT || 3000;
 
 // Artemox API configuration
 const ARTEMOX_API_KEY = process.env.API_KEY || 'sk-q__BVWFUdOxIdfAf6pWnrg';
@@ -15,10 +15,17 @@ const ARTEMOX_BASE_URL = 'https://api.artemox.com/v1';
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 
+// Health check endpoint for Railway
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // API proxy endpoint
 app.post('/api/analyze', async (req, res) => {
   try {
     const { model, messages, temperature } = req.body;
+
+    console.log('Proxying request to Artemox API...');
 
     const response = await fetch(`${ARTEMOX_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -43,6 +50,7 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     const data = await response.json();
+    console.log('Artemox API response received successfully');
     res.json(data);
   } catch (error) {
     console.error('Proxy Error:', error);
@@ -59,6 +67,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
-
