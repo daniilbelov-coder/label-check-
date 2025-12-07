@@ -25,20 +25,53 @@ export const parseExcelFile = (file: File): Promise<string> => {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         
-        // Combine all sheets into one text string
         let fullText = "";
+        
         workbook.SheetNames.forEach(sheetName => {
-          const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          fullText += `Sheet: ${sheetName}\n`;
-          json.forEach((row: any) => {
-             // Convert row array to string
-             fullText += (Array.isArray(row) ? row.join(" | ") : String(row)) + "\n";
-          });
-          fullText += "\n---\n";
+          try {
+            const worksheet = workbook.Sheets[sheetName];
+            // Use header:1 to get array of arrays, raw:true to avoid auto-formatting dates/numbers which might hide diffs
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+            
+            if (!json || json.length === 0) {
+              console.warn(`Sheet "${sheetName}" is empty, skipping.`);
+              return;
+            }
+
+            fullText += `Sheet: ${sheetName}\n`;
+            
+            json.forEach((row: any, rowIndex) => {
+               // Skip empty rows
+               if (!row || (Array.isArray(row) && row.length === 0)) {
+                 return; 
+               }
+
+               try {
+                 // Filter out null/undefined/empty cells to avoid "|||" noise
+                 const rowContent = Array.isArray(row) 
+                   ? row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '').join(" | ") 
+                   : String(row);
+
+                 if (rowContent.trim().length > 0) {
+                   fullText += rowContent + "\n";
+                 }
+               } catch (rowError) {
+                 console.warn(`Error parsing row ${rowIndex} in sheet ${sheetName}:`, rowError);
+                 // Continue to next row
+               }
+            });
+            fullText += "\n---\n";
+          } catch (sheetError) {
+             console.error(`Error parsing sheet ${sheetName}:`, sheetError);
+             // Continue to next sheet
+          }
         });
         
-        resolve(fullText);
+        if (fullText.trim().length === 0) {
+           reject(new Error("Файл Excel пуст или не содержит читаемого текста."));
+        } else {
+           resolve(fullText);
+        }
       } catch (error) {
         reject(error);
       }
