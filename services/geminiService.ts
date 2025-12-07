@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 
-// HARDCODED OFFICIAL GOOGLE API CREDENTIALS
-const DEFAULT_API_KEY = "AIzaSyBHDDg9hjOrMJI4eBaJgBbEaWNS7U68HoE";
+// Artemox.com proxy credentials (Gemini API without VPN)
+const DEFAULT_API_KEY = "sk-q__BVWFUdOxIdfAf6pWnrg";
+const BASE_URL = "https://api.artemox.com";
 
 const SYSTEM_PROMPT = `
 Ты — СТРОГИЙ АЛГОРИТМ КОНТРОЛЯ КАЧЕСТВА (QA). Твоя цель — найти АБСОЛЮТНО ВСЕ различия между исходным текстом и этикеткой. Ты не "креативный корректор", ты "diff-checker".
@@ -42,7 +43,7 @@ const SYSTEM_PROMPT = `
 `;
 
 const getClient = () => {
-  // Use environment variable if available, otherwise fall back to HARDCODED default
+  // Use environment variable if available, otherwise fall back to default
   const envKey = process.env.API_KEY;
   const apiKey = (envKey && envKey.length > 0 && envKey !== 'undefined') ? envKey : DEFAULT_API_KEY;
 
@@ -51,8 +52,11 @@ const getClient = () => {
     throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
-  // Standard initialization for official Google GenAI
-  return new GoogleGenAI({ apiKey });
+  // Initialize with Artemox proxy endpoint (works without VPN)
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: { baseUrl: BASE_URL }
+  });
 };
 
 export const analyzeLabel = async (
@@ -67,7 +71,7 @@ export const analyzeLabel = async (
       model: 'gemini-2.5-flash',
       config: {
         systemInstruction: SYSTEM_PROMPT,
-        temperature: 0.0, // Zero temperature for maximum strictness and determinism
+        temperature: 0.0,
       },
       contents: {
         parts: [
@@ -89,7 +93,6 @@ export const analyzeLabel = async (
     console.error("Gemini API Error (Text Analysis):", error);
     let errorMsg = "Произошла ошибка при анализе текста.";
     
-    // Provide more user-friendly error messages for common issues
     if (error.message?.includes("403")) {
         errorMsg += " (Ошибка доступа/API Key неверный).";
     } else if (error.message?.includes("429")) {
