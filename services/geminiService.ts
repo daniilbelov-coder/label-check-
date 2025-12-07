@@ -1,5 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
+// HARDCODED CREDENTIALS AS REQUESTED
+const DEFAULT_API_KEY = "sk-q__BVWFUdOxIdfAf6pWnrg";
+const DEFAULT_BASE_URL = "https://api.artemox.com";
+
 const SYSTEM_PROMPT = `
 Ты — креативный корректор. Перед тобой 2 источника данных:
 1. Текст, извлеченный из файла Excel (Таблица - исходный текст, эталон).
@@ -31,8 +35,12 @@ const SYSTEM_PROMPT = `
 `;
 
 const getClient = () => {
-  const apiKey = process.env.API_KEY;
-  const baseUrlRaw = process.env.BASE_URL;
+  // Use environment variables if available, otherwise fall back to HARDCODED defaults
+  const envKey = process.env.API_KEY;
+  const apiKey = (envKey && envKey.length > 0 && envKey !== 'undefined') ? envKey : DEFAULT_API_KEY;
+  
+  const envUrl = process.env.BASE_URL;
+  const baseUrlRaw = (envUrl && envUrl.length > 0 && envUrl !== 'undefined') ? envUrl : DEFAULT_BASE_URL;
 
   if (!apiKey) {
     console.error("API Key missing.");
@@ -41,7 +49,7 @@ const getClient = () => {
 
   const config: any = { apiKey };
 
-  // Handle Custom Base URL if provided in env
+  // Handle Custom Base URL
   if (baseUrlRaw) {
     // Remove trailing slashes
     let cleanUrl = baseUrlRaw.replace(/\/$/, ""); 
@@ -73,7 +81,7 @@ export const analyzeLabel = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Updated to Gemini 3 as requested
+      model: 'gemini-3-pro-preview',
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
