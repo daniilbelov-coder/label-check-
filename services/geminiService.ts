@@ -30,28 +30,26 @@ const SYSTEM_PROMPT = `
 - Используй Markdown.
 `;
 
-const getClient = () => {
-  // Access environment variables injected by Vite
+const getClient = (userApiKey?: string, userBaseUrl?: string) => {
+  // Use user provided credentials or fallback to environment variables
   // @ts-ignore
-  const apiKey = process.env.API_KEY;
+  const apiKey = userApiKey || process.env.API_KEY;
   // @ts-ignore
-  const baseUrlEnv = process.env.BASE_URL;
+  const baseUrlRaw = userBaseUrl || process.env.BASE_URL;
 
   if (!apiKey) {
-    console.error("API Key missing in environment.");
-    throw new Error("API Key is missing. Please check your Railway variables.");
+    console.error("API Key missing.");
+    throw new Error("API Key is missing. Please enter it in settings or check Railway variables.");
   }
 
   const config: any = { apiKey: apiKey };
 
   // Handle Custom Base URL (e.g., Artemox)
-  if (baseUrlEnv) {
+  if (baseUrlRaw) {
     // Remove trailing slashes
-    let cleanUrl = baseUrlEnv.replace(/\/$/, ""); 
+    let cleanUrl = baseUrlRaw.replace(/\/$/, ""); 
     
     // If the URL ends with /v1, strip it because the SDK appends paths automatically.
-    // However, if the provider is strict about the base path, we adjust here.
-    // Standard Google GenAI SDK usage with custom base URL usually requires the root domain.
     if (cleanUrl.endsWith("/v1")) {
        cleanUrl = cleanUrl.substring(0, cleanUrl.length - 3);
     }
@@ -72,9 +70,11 @@ const getClient = () => {
 export const analyzeLabel = async (
   labelBase64: string,
   labelMimeType: string,
-  excelText: string
+  excelText: string,
+  userApiKey?: string,
+  userBaseUrl?: string
 ): Promise<string> => {
-  const ai = getClient();
+  const ai = getClient(userApiKey, userBaseUrl);
 
   try {
     const response = await ai.models.generateContent({
@@ -104,50 +104,5 @@ export const analyzeLabel = async (
     let errorMsg = "Произошла ошибка при анализе текста.";
     if (error.message) errorMsg += ` (${error.message})`;
     throw new Error(errorMsg);
-  }
-};
-
-export const generateAnnotatedLabel = async (
-  labelBase64: string,
-  labelMimeType: string,
-  analysisReport: string
-): Promise<string | undefined> => {
-  const ai = getClient();
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Using the image model
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: labelMimeType,
-              data: labelBase64,
-            },
-          },
-          {
-            text: `Это изображение этикетки продукта. 
-            Были найдены следующие ошибки:
-            ${analysisReport.substring(0, 500)}...
-            
-            Верни это же изображение, но НАРИСУЙ на нем красные обводки/стрелки в местах ошибок.`,
-          },
-        ],
-      },
-    });
-
-    // Extract the image from response
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-         if (part.inlineData && part.inlineData.data) {
-             return part.inlineData.data;
-         }
-      }
-    }
-    return undefined;
-  } catch (error) {
-    console.error("Gemini API Error (Image Annotation):", error);
-    // Silent fail for annotation is acceptable, just return undefined
-    return undefined;
   }
 };

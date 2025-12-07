@@ -8,7 +8,6 @@ export interface FileData {
 
 export interface AnalysisResultData {
   markdown: string;
-  annotatedImageUrl?: string;
 }
 
 export interface DragDropProps {
