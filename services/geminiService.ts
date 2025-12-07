@@ -1,8 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
-// HARDCODED CREDENTIALS AS REQUESTED
-const DEFAULT_API_KEY = "sk-q__BVWFUdOxIdfAf6pWnrg";
-const DEFAULT_BASE_URL = "https://api.artemox.com";
+// HARDCODED OFFICIAL GOOGLE API CREDENTIALS
+const DEFAULT_API_KEY = "AIzaSyBHDDg9hjOrMJI4eBaJgBbEaWNS7U68HoE";
 
 const SYSTEM_PROMPT = `
 Ты — креативный корректор. Перед тобой 2 источника данных:
@@ -35,41 +34,17 @@ const SYSTEM_PROMPT = `
 `;
 
 const getClient = () => {
-  // Use environment variables if available, otherwise fall back to HARDCODED defaults
+  // Use environment variable if available, otherwise fall back to HARDCODED default
   const envKey = process.env.API_KEY;
   const apiKey = (envKey && envKey.length > 0 && envKey !== 'undefined') ? envKey : DEFAULT_API_KEY;
-  
-  const envUrl = process.env.BASE_URL;
-  const baseUrlRaw = (envUrl && envUrl.length > 0 && envUrl !== 'undefined') ? envUrl : DEFAULT_BASE_URL;
 
   if (!apiKey) {
     console.error("API Key missing.");
     throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
-  const config: any = { apiKey };
-
-  // Handle Custom Base URL
-  if (baseUrlRaw) {
-    // Remove trailing slashes
-    let cleanUrl = baseUrlRaw.replace(/\/$/, ""); 
-    
-    // If the URL ends with /v1, strip it because the SDK appends paths automatically.
-    if (cleanUrl.endsWith("/v1")) {
-       cleanUrl = cleanUrl.substring(0, cleanUrl.length - 3);
-    }
-    
-    config.baseUrl = cleanUrl;
-  }
-  
-  // Custom headers for 'sk-' keys (OpenAI-compatible proxies often need Bearer auth)
-  if (apiKey.startsWith('sk-')) {
-    config.customHeaders = {
-      'Authorization': `Bearer ${apiKey}`
-    };
-  }
-
-  return new GoogleGenAI(config);
+  // Standard initialization for official Google GenAI
+  return new GoogleGenAI({ apiKey });
 };
 
 export const analyzeLabel = async (
@@ -81,7 +56,7 @@ export const analyzeLabel = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.5-flash',
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
@@ -105,7 +80,16 @@ export const analyzeLabel = async (
   } catch (error: any) {
     console.error("Gemini API Error (Text Analysis):", error);
     let errorMsg = "Произошла ошибка при анализе текста.";
-    if (error.message) errorMsg += ` (${error.message})`;
+    
+    // Provide more user-friendly error messages for common issues
+    if (error.message?.includes("403")) {
+        errorMsg += " (Ошибка доступа/API Key неверный).";
+    } else if (error.message?.includes("429")) {
+        errorMsg += " (Слишком много запросов, попробуйте позже).";
+    } else if (error.message) {
+        errorMsg += ` (${error.message})`;
+    }
+    
     throw new Error(errorMsg);
   }
 };

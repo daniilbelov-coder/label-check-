@@ -20,7 +20,6 @@ export default defineConfig(({ mode }) => {
     define: {
       // Explicitly inject environment variables globally so they are available in the client bundle
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
-      'process.env.BASE_URL': JSON.stringify(env.BASE_URL),
     },
   };
 });
