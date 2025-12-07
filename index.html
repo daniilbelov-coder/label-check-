@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LabelCheck AI - Умная проверка этикеток</title>
     
-    <!-- Safety Shim: Ensures process.env exists in browser to prevent crashes if Vite doesn't inject it yet -->
+    <!-- Safety Shim: Ensures process.env exists in browser if Vite define plugin misses for any reason during hydration -->
     <script>
-      window.process = { env: {} };
+      window.process = window.process || { env: {} };
     </script>
 
-    <!-- Tailwind CSS (CDN for guaranteed styling) -->
+    <!-- Tailwind CSS (CDN used for guaranteed styling consistency without PostCSS build complexity) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {

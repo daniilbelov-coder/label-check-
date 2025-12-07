@@ -118,7 +118,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Upload Section - Hidden when showing results to save space, or can stay if preferred. Let's keep it but maybe simplified if result exists. For now, standard behavior. */}
+        {/* Upload Section */}
         {!result && (
         <div className="grid md:grid-cols-2 gap-6 relative max-w-5xl mx-auto">
           

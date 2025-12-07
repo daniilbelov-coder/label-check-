@@ -30,26 +30,15 @@ const SYSTEM_PROMPT = `
 - Используй Markdown.
 `;
 
-// Helper to get safe string from env
-const getEnvVar = (key: string): string => {
-  // @ts-ignore
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    // @ts-ignore
-    return process.env[key];
-  }
-  // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-    // @ts-ignore
-    return import.meta.env[key];
-  }
-  return '';
-};
-
 const getClient = () => {
-  const apiKey = getEnvVar('API_KEY');
-  const baseUrlEnv = getEnvVar('BASE_URL');
+  // Access environment variables injected by Vite
+  // @ts-ignore
+  const apiKey = process.env.API_KEY;
+  // @ts-ignore
+  const baseUrlEnv = process.env.BASE_URL;
 
   if (!apiKey) {
+    console.error("API Key missing in environment.");
     throw new Error("API Key is missing. Please check your Railway variables.");
   }
 
@@ -57,19 +46,20 @@ const getClient = () => {
 
   // Handle Custom Base URL (e.g., Artemox)
   if (baseUrlEnv) {
-    // Remove trailing slashes and version suffixes (v1/v1beta) as SDK handles versions
+    // Remove trailing slashes
     let cleanUrl = baseUrlEnv.replace(/\/$/, ""); 
     
-    // Some custom proxies require the exact URL provided in the docs.
-    // If the provider specifically said "https://api.artemox.com", we use that.
-    if (cleanUrl.includes("/v1")) {
-       cleanUrl = cleanUrl.replace("/v1", "");
+    // If the URL ends with /v1, strip it because the SDK appends paths automatically.
+    // However, if the provider is strict about the base path, we adjust here.
+    // Standard Google GenAI SDK usage with custom base URL usually requires the root domain.
+    if (cleanUrl.endsWith("/v1")) {
+       cleanUrl = cleanUrl.substring(0, cleanUrl.length - 3);
     }
     
     config.baseUrl = cleanUrl;
   }
   
-  // Custom headers for 'sk-' keys if needed by specific proxies that mimic OpenAI
+  // Custom headers for 'sk-' keys (OpenAI-compatible proxies often need Bearer auth)
   if (apiKey.startsWith('sk-')) {
     config.customHeaders = {
       'Authorization': `Bearer ${apiKey}`
@@ -88,7 +78,7 @@ export const analyzeLabel = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-lite', // Updated to model supported by Artemox
+      model: 'gemini-2.0-flash-lite', // Specific model for your provider
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
@@ -126,7 +116,7 @@ export const generateAnnotatedLabel = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Using the image model available in your list
+      model: 'gemini-2.5-flash-image', // Using the image model
       contents: {
         parts: [
           {
@@ -157,6 +147,7 @@ export const generateAnnotatedLabel = async (
     return undefined;
   } catch (error) {
     console.error("Gemini API Error (Image Annotation):", error);
+    // Silent fail for annotation is acceptable, just return undefined
     return undefined;
   }
 };
