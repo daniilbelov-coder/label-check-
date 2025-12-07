@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LabelCheck AI - Умная проверка этикеток</title>
+    <!-- We keep Tailwind CDN for simplicity to avoid setting up PostCSS file, 
+         though in a large prod app you'd install it via npm -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -54,12 +56,15 @@
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
     "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0",
     "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1",
-    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1"
+    "vite": "https://aistudiocdn.com/vite@^7.2.6",
+    "jspdf": "https://aistudiocdn.com/jspdf@^3.0.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
   }
 }
 </script>
 </head>
   <body class="bg-gray-50 text-slate-900 antialiased selection:bg-blue-100 selection:text-blue-900">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
