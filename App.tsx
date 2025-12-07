@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Scan, Sparkles, ArrowRight, RefreshCw, AlertTriangle, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Scan, Sparkles, ArrowRight, RefreshCw, AlertTriangle } from 'lucide-react';
 import Dropzone from './components/Dropzone';
 import AnalysisResult from './components/AnalysisResult';
 import { FileData, AnalysisResultData } from './types';
@@ -13,11 +13,6 @@ const App: React.FC = () => {
   const [loadingStage, setLoadingStage] = useState<string>("");
   const [result, setResult] = useState<AnalysisResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // User Settings State
-  const [showSettings, setShowSettings] = useState(false);
-  const [userApiKey, setUserApiKey] = useState("");
-  const [userBaseUrl, setUserBaseUrl] = useState("");
 
   const handleLabelSelect = async (file: File) => {
     try {
@@ -64,9 +59,7 @@ const App: React.FC = () => {
       const analysisText = await analyzeLabel(
         labelBase64,
         labelFile.file.type,
-        excelFile.content || "",
-        userApiKey,
-        userBaseUrl
+        excelFile.content || ""
       );
 
       setResult({
@@ -98,55 +91,6 @@ const App: React.FC = () => {
           <span className="text-2xl font-bold tracking-tight text-slate-900">LabelCheck <span className="text-blue-600">AI</span></span>
         </div>
         
-        {/* Settings Toggle Button (Absolute positioned top right of header area) */}
-        <div className="absolute top-0 right-0">
-          <button 
-            onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
-          >
-            <Settings size={18} />
-            <span>Настройки API</span>
-          </button>
-        </div>
-
-        {/* Collapsible Settings Panel */}
-        {showSettings && (
-          <div className="absolute top-12 right-0 z-20 w-80 bg-white rounded-xl shadow-xl border border-gray-200 p-4 text-left animate-fade-in-up">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Настройки подключения</h3>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  API Key (необязательно)
-                </label>
-                <input 
-                  type="password"
-                  value={userApiKey}
-                  onChange={(e) => setUserApiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="text-[10px] text-gray-400 mt-1">
-                  Если не указан, используется системный ключ.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Base URL (необязательно)
-                </label>
-                <input 
-                  type="text"
-                  value={userBaseUrl}
-                  onChange={(e) => setUserBaseUrl(e.target.value)}
-                  placeholder="https://api.artemox.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
         <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">
           Умная проверка этикеток
         </h1>

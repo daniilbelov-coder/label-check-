@@ -30,21 +30,18 @@ const SYSTEM_PROMPT = `
 - Используй Markdown.
 `;
 
-const getClient = (userApiKey?: string, userBaseUrl?: string) => {
-  // Use user provided credentials or fallback to environment variables
-  // @ts-ignore
-  const apiKey = userApiKey || process.env.API_KEY;
-  // @ts-ignore
-  const baseUrlRaw = userBaseUrl || process.env.BASE_URL;
+const getClient = () => {
+  const apiKey = process.env.API_KEY;
+  const baseUrlRaw = process.env.BASE_URL;
 
   if (!apiKey) {
     console.error("API Key missing.");
-    throw new Error("API Key is missing. Please enter it in settings or check Railway variables.");
+    throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
-  const config: any = { apiKey: apiKey };
+  const config: any = { apiKey };
 
-  // Handle Custom Base URL (e.g., Artemox)
+  // Handle Custom Base URL if provided in env
   if (baseUrlRaw) {
     // Remove trailing slashes
     let cleanUrl = baseUrlRaw.replace(/\/$/, ""); 
@@ -70,15 +67,13 @@ const getClient = (userApiKey?: string, userBaseUrl?: string) => {
 export const analyzeLabel = async (
   labelBase64: string,
   labelMimeType: string,
-  excelText: string,
-  userApiKey?: string,
-  userBaseUrl?: string
+  excelText: string
 ): Promise<string> => {
-  const ai = getClient(userApiKey, userBaseUrl);
+  const ai = getClient();
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-lite', // Specific model for your provider
+      model: 'gemini-3-pro-preview', // Updated to Gemini 3 as requested
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
