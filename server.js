@@ -35,7 +35,7 @@ const server = http.createServer(async (req, res) => {
             'Authorization': `Bearer ${ARTEMOX_API_KEY}`,
           },
           body: JSON.stringify({
-            model: data.model || 'gemini-2.5-flash',
+            model: data.model || 'gemini-2.0-flash',
             messages: data.messages,
             temperature: data.temperature ?? 0,
           }),

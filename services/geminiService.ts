@@ -55,7 +55,7 @@ export const analyzeLabel = async (
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'gemini-2.5-flash', messages, temperature: 0 }),
+    body: JSON.stringify({ model: 'gemini-2.0-flash', messages, temperature: 0 }),
   });
 
   if (!response.ok) {
