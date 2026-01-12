@@ -41,69 +41,28 @@ export const analyzeLabel = async (
   labelMimeType: string,
   excelText: string
 ): Promise<string> => {
-  try {
-    // Build OpenAI-compatible message format with image
-    const messages = [
-      {
-        role: 'system',
-        content: SYSTEM_PROMPT,
-      },
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:${labelMimeType};base64,${labelBase64}`,
-            },
-          },
-          {
-            type: 'text',
-            text: `ЭТАЛОН (EXCEL):\n${excelText}\n\nСравни это с изображением. Будь педантичен к регистру букв.`,
-          },
-        ],
-      },
-    ];
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:${labelMimeType};base64,${labelBase64}` } },
+        { type: 'text', text: `ЭТАЛОН (EXCEL):\n${excelText}\n\nСравни это с изображением. Будь педантичен к регистру букв.` },
+      ],
+    },
+  ];
 
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gemini-2.5-flash',
-        messages,
-        temperature: 0,
-      }),
-    });
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'gemini-2.5-flash', messages, temperature: 0 }),
+  });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.details || `HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    // Extract text from OpenAI-compatible response format
-    const resultText = data.choices?.[0]?.message?.content;
-    
-    if (!resultText) {
-      throw new Error('Empty response from API');
-    }
-
-    return resultText;
-  } catch (error: any) {
-    console.error("API Error (Text Analysis):", error);
-    let errorMsg = "Произошла ошибка при анализе текста.";
-    
-    if (error.message?.includes("403")) {
-      errorMsg += " (Ошибка доступа/API Key неверный).";
-    } else if (error.message?.includes("429")) {
-      errorMsg += " (Слишком много запросов, попробуйте позже).";
-    } else if (error.message) {
-      errorMsg += ` (${error.message})`;
-    }
-    
-    throw new Error(errorMsg);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.details || `HTTP ${response.status}`);
   }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || 'Пустой ответ от API';
 };
