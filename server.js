@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 
+// LLaVA 13B vision model
+const MODEL_VERSION = '80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb';
+
 const mimeTypes = {
   '.html': 'text/html',
   '.js': 'application/javascript',
@@ -23,12 +26,14 @@ const mimeTypes = {
 
 // Wait for Replicate prediction to complete
 async function waitForPrediction(predictionId) {
-  const maxAttempts = 60; // 2 minutes max
+  const maxAttempts = 120; // 4 minutes max
   for (let i = 0; i < maxAttempts; i++) {
     const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
       headers: { 'Authorization': `Bearer ${REPLICATE_API_KEY}` },
     });
     const prediction = await response.json();
+    
+    console.log(`Prediction status: ${prediction.status}`);
     
     if (prediction.status === 'succeeded') {
       return prediction.output;
@@ -50,7 +55,9 @@ const server = http.createServer(async (req, res) => {
         const data = JSON.parse(body);
         const { imageUrl, prompt } = data;
 
-        // Create prediction with Llama 3.2 Vision
+        console.log('Creating prediction...');
+
+        // Create prediction with LLaVA
         const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
           method: 'POST',
           headers: {
@@ -58,7 +65,7 @@ const server = http.createServer(async (req, res) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'meta/llama-3.2-90b-vision-instruct',
+            version: MODEL_VERSION,
             input: {
               image: imageUrl,
               prompt: prompt,
@@ -77,6 +84,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         const prediction = await createResponse.json();
+        console.log('Prediction created:', prediction.id);
         
         // Wait for completion
         const output = await waitForPrediction(prediction.id);
