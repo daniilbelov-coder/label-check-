@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
-const ARTEMOX_API_KEY = process.env.API_KEY || 'sk-q__BVWFUdOxIdfAf6pWnrg';
+const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 
 const mimeTypes = {
   '.html': 'text/html',
@@ -21,6 +21,26 @@ const mimeTypes = {
   '.woff2': 'font/woff2',
 };
 
+// Wait for Replicate prediction to complete
+async function waitForPrediction(predictionId) {
+  const maxAttempts = 60; // 2 minutes max
+  for (let i = 0; i < maxAttempts; i++) {
+    const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
+      headers: { 'Authorization': `Bearer ${REPLICATE_API_KEY}` },
+    });
+    const prediction = await response.json();
+    
+    if (prediction.status === 'succeeded') {
+      return prediction.output;
+    } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
+      throw new Error(prediction.error || 'Prediction failed');
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+  }
+  throw new Error('Prediction timeout');
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/analyze') {
     let body = '';
@@ -28,22 +48,46 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const data = JSON.parse(body);
-        const apiRes = await fetch('https://api.artemox.com/v1/chat/completions', {
+        const { imageUrl, prompt } = data;
+
+        // Create prediction with Llama 3.2 Vision
+        const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
           method: 'POST',
           headers: {
+            'Authorization': `Bearer ${REPLICATE_API_KEY}`,
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${ARTEMOX_API_KEY}`,
           },
           body: JSON.stringify({
-            model: data.model || 'gemini-2.0-flash',
-            messages: data.messages,
-            temperature: data.temperature ?? 0,
+            model: 'meta/llama-3.2-90b-vision-instruct',
+            input: {
+              image: imageUrl,
+              prompt: prompt,
+              max_tokens: 4096,
+              temperature: 0.1,
+            },
           }),
         });
-        const result = await apiRes.text();
-        res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
-        res.end(result);
+
+        if (!createResponse.ok) {
+          const errorText = await createResponse.text();
+          console.error('Replicate API Error:', createResponse.status, errorText);
+          res.writeHead(createResponse.status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: errorText }));
+          return;
+        }
+
+        const prediction = await createResponse.json();
+        
+        // Wait for completion
+        const output = await waitForPrediction(prediction.id);
+        
+        // Output is an array of strings, join them
+        const resultText = Array.isArray(output) ? output.join('') : output;
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ result: resultText }));
       } catch (err) {
+        console.error('API Error:', err.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }

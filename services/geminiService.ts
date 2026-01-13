@@ -41,28 +41,26 @@ export const analyzeLabel = async (
   labelMimeType: string,
   excelText: string
 ): Promise<string> => {
-  const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    {
-      role: 'user',
-      content: [
-        { type: 'image_url', image_url: { url: `data:${labelMimeType};base64,${labelBase64}` } },
-        { type: 'text', text: `ЭТАЛОН (EXCEL):\n${excelText}\n\nСравни это с изображением. Будь педантичен к регистру букв.` },
-      ],
-    },
-  ];
+  const imageUrl = `data:${labelMimeType};base64,${labelBase64}`;
+  
+  const prompt = `${SYSTEM_PROMPT}
+
+ЭТАЛОН (EXCEL):
+${excelText}
+
+Внимательно изучи изображение этикетки и сравни с эталоном выше. Будь педантичен к регистру букв. Найди все расхождения.`;
 
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'gemini-2.0-flash', messages, temperature: 0 }),
+    body: JSON.stringify({ imageUrl, prompt }),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.details || `HTTP ${response.status}`);
+    throw new Error(err.error || `HTTP ${response.status}`);
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || 'Пустой ответ от API';
+  return data.result || 'Пустой ответ от API';
 };
