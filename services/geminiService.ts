@@ -43,9 +43,7 @@ export const analyzeLabel = async (
 ): Promise<string> => {
   const imageUrl = `data:${labelMimeType};base64,${labelBase64}`;
   
-  const prompt = `${SYSTEM_PROMPT}
-
-ЭТАЛОН (EXCEL):
+  const prompt = `ЭТАЛОН (EXCEL):
 ${excelText}
 
 Внимательно изучи изображение этикетки и сравни с эталоном выше. Будь педантичен к регистру букв. Найди все расхождения.`;
@@ -53,7 +51,11 @@ ${excelText}
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageUrl, prompt }),
+    body: JSON.stringify({ 
+      imageUrl, 
+      prompt,
+      systemPrompt: SYSTEM_PROMPT 
+    }),
   });
 
   if (!response.ok) {

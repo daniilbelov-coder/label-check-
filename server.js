@@ -9,8 +9,8 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 
-// LLaVA 13B vision model
-const MODEL_VERSION = '80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb';
+// Google Gemini 2.5 Flash on Replicate
+const MODEL_VERSION = 'bfb7df9586ae4fafa00a593d8dc4868698f72cf9d695da28b8c8a70f88e876ba';
 
 const mimeTypes = {
   '.html': 'text/html',
@@ -26,7 +26,7 @@ const mimeTypes = {
 
 // Wait for Replicate prediction to complete
 async function waitForPrediction(predictionId) {
-  const maxAttempts = 120; // 4 minutes max
+  const maxAttempts = 120;
   for (let i = 0; i < maxAttempts; i++) {
     const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
       headers: { 'Authorization': `Bearer ${REPLICATE_API_KEY}` },
@@ -41,7 +41,7 @@ async function waitForPrediction(predictionId) {
       throw new Error(prediction.error || 'Prediction failed');
     }
     
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
   throw new Error('Prediction timeout');
 }
@@ -53,11 +53,11 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const data = JSON.parse(body);
-        const { imageUrl, prompt } = data;
+        const { imageUrl, prompt, systemPrompt } = data;
 
-        console.log('Creating prediction...');
+        console.log('Creating Gemini prediction...');
 
-        // Create prediction with LLaVA
+        // Create prediction with Gemini 2.5 Flash
         const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
           method: 'POST',
           headers: {
@@ -67,10 +67,11 @@ const server = http.createServer(async (req, res) => {
           body: JSON.stringify({
             version: MODEL_VERSION,
             input: {
-              image: imageUrl,
               prompt: prompt,
-              max_tokens: 4096,
+              images: [imageUrl],
+              system_instruction: systemPrompt,
               temperature: 0.1,
+              max_output_tokens: 8192,
             },
           }),
         });
@@ -89,8 +90,8 @@ const server = http.createServer(async (req, res) => {
         // Wait for completion
         const output = await waitForPrediction(prediction.id);
         
-        // Output is an array of strings, join them
-        const resultText = Array.isArray(output) ? output.join('') : output;
+        // Output format depends on the model
+        const resultText = typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ result: resultText }));
