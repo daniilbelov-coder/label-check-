@@ -84,3 +84,21 @@ export const parseExcelFile = (file: File): Promise<string> => {
 export const createPreviewUrl = (file: File): string => {
   return URL.createObjectURL(file);
 };
+
+export const generateAndDownloadExcel = (data: Record<string, string>, fileName: string = 'processed_brief.xlsx') => {
+  // Convert object to array of arrays for Excel [["Header", "Content"], ...]
+  const wsData = [
+    ["Раздел", "Скорректированный текст"], // Headers
+    ...Object.entries(data)
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Auto-width column somewhat
+  const wscols = [{ wch: 30 }, { wch: 100 }];
+  ws['!cols'] = wscols;
+
+  XLSX.utils.book_append_sheet(wb, ws, "Бриф");
+  XLSX.writeFile(wb, fileName);
+};

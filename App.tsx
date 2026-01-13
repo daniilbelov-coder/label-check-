@@ -1,221 +1,146 @@
-import React, { useState } from 'react';
-import { Scan, Sparkles, ArrowRight, RefreshCw, AlertTriangle } from 'lucide-react';
-import Dropzone from './components/Dropzone';
-import AnalysisResult from './components/AnalysisResult';
-import { FileData, AnalysisResultData } from './types';
-import { fileToBase64, parseExcelFile, createPreviewUrl } from './utils/fileHelpers';
-import { analyzeLabel } from './services/geminiService';
+import React, { useState, useEffect } from 'react';
+import { Scan, FileText, CheckCheck, FileSpreadsheet, ChevronRight, Sun, Moon } from 'lucide-react';
+import BriefProcessor from './components/BriefProcessor';
+import LabelComparator from './components/LabelComparator';
+import FinalCheck from './components/FinalCheck';
+import { AppView } from './types';
 
 const App: React.FC = () => {
-  const [labelFile, setLabelFile] = useState<FileData | null>(null);
-  const [excelFile, setExcelFile] = useState<FileData | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [loadingStage, setLoadingStage] = useState<string>("");
-  const [result, setResult] = useState<AnalysisResultData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleLabelSelect = async (file: File) => {
-    try {
-      const previewUrl = createPreviewUrl(file);
-      setLabelFile({
-        file,
-        previewUrl,
-        type: 'label'
-      });
-      setError(null);
-    } catch (err) {
-      console.error(err);
-      setError("Ошибка при обработке файла этикетки.");
+  const [currentView, setCurrentView] = useState<AppView>('home');
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark' || 
+             (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     }
-  };
+    return false;
+  });
 
-  const handleExcelSelect = async (file: File) => {
-    try {
-      const text = await parseExcelFile(file);
-      setExcelFile({
-        file,
-        content: text,
-        type: 'excel'
-      });
-      setError(null);
-    } catch (err) {
-      console.error(err);
-      setError("Ошибка при чтении Excel файла. Убедитесь, что формат верный.");
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
     }
-  };
+  }, [isDarkMode]);
 
-  const handleAnalyze = async () => {
-    if (!labelFile || !excelFile) return;
+  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
-    setIsAnalyzing(true);
-    setResult(null);
-    setError(null);
+  const renderContent = () => {
+    switch (currentView) {
+      case 'brief':
+        return <BriefProcessor onBack={() => setCurrentView('home')} onNavigate={setCurrentView} />;
+      case 'compare':
+        return <LabelComparator onBack={() => setCurrentView('home')} onNavigate={setCurrentView} />;
+      case 'final':
+        return <FinalCheck onBack={() => setCurrentView('home')} onNavigate={setCurrentView} />;
+      default:
+        return (
+          <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full animate-fade-up">
+            {/* Block 1: Brief */}
+            <button 
+              onClick={() => setCurrentView('brief')}
+              className="group bg-white dark:bg-slate-900 p-10 rounded-[40px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 hover:shadow-2xl hover:ring-brand-100 dark:hover:ring-brand-900 transition-all text-left flex flex-col h-full"
+            >
+              <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/30 text-brand-500 rounded-[24px] flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-brand-500 group-hover:text-white transition-all duration-500">
+                <FileSpreadsheet size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Работа с брифом</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed mb-8 flex-grow">
+                Загрузите "сырой" Excel бриф. ИИ структурирует данные, исправит кавычки, тире и регистр согласно строгим правилам Яндекса.
+              </p>
+              <div className="inline-flex items-center text-brand-600 dark:text-brand-400 font-bold text-sm tracking-wide group-hover:gap-2 transition-all">
+                НАЧАТЬ ОБРАБОТКУ <ChevronRight size={16} />
+              </div>
+            </button>
 
-    try {
-      const labelBase64 = await fileToBase64(labelFile.file);
-      
-      // Stage 1: Text Analysis
-      setLoadingStage("Сверяем текст с таблицей...");
-      const analysisText = await analyzeLabel(
-        labelBase64,
-        labelFile.file.type,
-        excelFile.content || ""
-      );
+            {/* Block 2: Comparison - Fully unified style, no badge */}
+            <button 
+              onClick={() => setCurrentView('compare')}
+              className="group bg-white dark:bg-slate-900 p-10 rounded-[40px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 hover:shadow-2xl hover:ring-brand-100 dark:hover:ring-brand-900 transition-all text-left flex flex-col h-full"
+            >
+              <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/30 text-brand-500 rounded-[24px] flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-brand-500 group-hover:text-white transition-all duration-500">
+                <Scan size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Сверка с брифом</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed mb-8 flex-grow">
+                Сравнение готовой этикетки с эталоном. ИИ найдет любые расхождения в составе, орфографии и даже регистре букв.
+              </p>
+              <div className="inline-flex items-center text-brand-600 dark:text-brand-400 font-bold text-sm tracking-wide group-hover:gap-2 transition-all">
+                ПЕРЕЙТИ К СВЕРКЕ <ChevronRight size={16} />
+              </div>
+            </button>
 
-      setResult({
-        markdown: analysisText
-      });
-
-    } catch (err: any) {
-      setError(err.message || "Произошла ошибка при анализе.");
-    } finally {
-      setIsAnalyzing(false);
-      setLoadingStage("");
+            {/* Block 3: Proofread */}
+            <button 
+              onClick={() => setCurrentView('final')}
+              className="group bg-white dark:bg-slate-900 p-10 rounded-[40px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 hover:shadow-2xl hover:ring-brand-100 dark:hover:ring-brand-900 transition-all text-left flex flex-col h-full"
+            >
+              <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/30 text-brand-500 rounded-[24px] flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-brand-500 group-hover:text-white transition-all duration-500">
+                <CheckCheck size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Финальная вычитка</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed mb-8 flex-grow">
+                Проверка макета без сравнения с исходником. Поиск опечаток и контроль правил оформления текста.
+              </p>
+              <div className="inline-flex items-center text-brand-600 dark:text-brand-400 font-bold text-sm tracking-wide group-hover:gap-2 transition-all">
+                НАЧАТЬ ПРОВЕРКУ <ChevronRight size={16} />
+              </div>
+            </button>
+          </div>
+        );
     }
-  };
-
-  const handleReset = () => {
-    setLabelFile(null);
-    setExcelFile(null);
-    setResult(null);
-    setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center py-16 px-6 sm:px-10 lg:px-12 transition-colors duration-300">
       
+      {/* Theme Toggle & Header Container */}
+      <div className="max-w-6xl w-full flex justify-end mb-4">
+        <button
+          onClick={toggleDarkMode}
+          className="p-3 rounded-2xl glass-card text-slate-500 dark:text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 transition-all shadow-sm"
+          aria-label="Toggle theme"
+        >
+          {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+      </div>
+
       {/* Header */}
-      <header className="max-w-4xl w-full text-center mb-12 relative">
-        <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
-          <Scan className="w-8 h-8 text-blue-600 mr-2" />
-          <span className="text-2xl font-bold tracking-tight text-slate-900">LabelCheck <span className="text-blue-600">AI</span></span>
-        </div>
-        
-        <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">
-          Умная проверка этикеток
-        </h1>
-        <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-          Автоматически сравнивайте макет этикетки с исходными данными Excel. Находите опечатки, несоответствия и ошибки в составе за секунды.
-        </p>
+      <header 
+        className={`max-w-4xl w-full text-center transition-all duration-500 ${currentView === 'home' ? 'mb-16' : 'mb-4'}`}
+      >
+        {currentView === 'home' && (
+          <div className="animate-fade-in">
+            <div className="inline-flex items-center justify-center gap-2 mb-8 glass-card px-5 py-2.5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+              <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center text-white">
+                <Scan size={18} />
+              </div>
+              <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">Этикетка <span className="text-brand-500">AI</span></span>
+            </div>
+            
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 tracking-tight">
+              Полный цикл <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-600 dark:from-brand-400 dark:to-indigo-400">разработки этикетки</span>
+            </h1>
+            <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+              Автоматизированная система вычитки, сверки и структурирования данных для макетов упаковки продукции.
+            </p>
+          </div>
+        )}
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-6xl w-full space-y-8">
-        
-        {/* Error Banner */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-red-700 animate-fade-in max-w-3xl mx-auto">
-            <AlertTriangle size={20} />
-            <p>{error}</p>
-          </div>
-        )}
-
-        {/* Upload Section */}
-        {!result && (
-        <div className="grid md:grid-cols-2 gap-6 relative max-w-5xl mx-auto">
-          
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider ml-1">1. Изображение этикетки</h2>
-            <Dropzone
-              type="label"
-              accept="image/png, image/jpeg, image/webp, application/pdf"
-              fileData={labelFile}
-              onFileSelect={handleLabelSelect}
-              onClear={() => setLabelFile(null)}
-              title="Загрузите этикетку"
-              description="Перетащите PNG, JPG или PDF файл сюда"
-            />
-          </div>
-
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider ml-1">2. Данные Excel</h2>
-            <Dropzone
-              type="excel"
-              accept=".xlsx, .xls"
-              fileData={excelFile}
-              onFileSelect={handleExcelSelect}
-              onClear={() => setExcelFile(null)}
-              title="Загрузите таблицу"
-              description="Перетащите файл .xlsx с исходным текстом"
-            />
-          </div>
-
-          {/* Connection Line (Desktop only) */}
-          <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 w-12 h-12 bg-white rounded-full items-center justify-center border border-gray-200 shadow-sm">
-             <ArrowRight className="text-gray-400" size={20} />
-          </div>
-        </div>
-        )}
-
-        {/* Action Button */}
-        {!result && (
-        <div className="flex justify-center pt-4">
-            <button
-              onClick={handleAnalyze}
-              disabled={!labelFile || !excelFile || isAnalyzing}
-              className={`
-                group relative px-8 py-4 rounded-full font-semibold text-lg flex items-center gap-3 shadow-lg transition-all duration-300
-                ${(!labelFile || !excelFile) 
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
-                  : isAnalyzing 
-                    ? 'bg-blue-600 text-white cursor-wait pr-6'
-                    : 'bg-slate-900 text-white hover:bg-blue-600 hover:shadow-blue-200 hover:-translate-y-1'
-                }
-              `}
-            >
-              {isAnalyzing ? (
-                <>
-                  <RefreshCw className="animate-spin" size={20} />
-                  {loadingStage || "Анализ..."}
-                </>
-              ) : (
-                <>
-                  <Sparkles size={20} className={(!labelFile || !excelFile) ? '' : 'text-blue-300 group-hover:text-white'} />
-                  Проверить этикетку
-                </>
-              )}
-            </button>
-        </div>
-        )}
-
-        {/* Show Reset Button when result is visible */}
-        {result && (
-          <div className="flex justify-center mb-8">
-            <button
-              onClick={handleReset}
-              className="px-6 py-3 rounded-full bg-white border border-gray-200 text-slate-600 font-medium hover:bg-gray-50 hover:text-slate-900 transition-colors shadow-sm flex items-center gap-2"
-            >
-              <RefreshCw size={18} />
-              Загрузить новые файлы
-            </button>
-          </div>
-        )}
-
-        {/* Scanning Overlay Effect */}
-        {isAnalyzing && labelFile && (
-           <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-50 flex flex-col items-center justify-center">
-             <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 animate-scan z-10 opacity-50 shadow-[0_0_15px_rgba(59,130,246,0.6)]"></div>
-                <div className="mb-6 relative w-24 h-24 mx-auto bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
-                    {labelFile.previewUrl && (
-                        <img src={labelFile.previewUrl} className="w-full h-full object-cover opacity-50" alt="" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/20 to-transparent animate-scan h-full"></div>
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Идет проверка</h3>
-                <p className="text-gray-500 text-sm">{loadingStage}</p>
-             </div>
-           </div>
-        )}
-
-        {/* Results Section */}
-        {result && (
-          <div className="animate-fade-in pb-20">
-            <AnalysisResult data={result} />
-          </div>
-        )}
-
+      {/* Main Content */}
+      <main className="w-full flex-grow flex flex-col">
+        {renderContent()}
       </main>
+
+      {/* Footer */}
+      {currentView === 'home' && (
+        <footer className="mt-20 text-slate-400 dark:text-slate-600 text-sm font-medium tracking-wide animate-fade-in">
+          Made by D.Belov
+        </footer>
+      )}
     </div>
   );
 };

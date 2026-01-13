@@ -10,6 +10,11 @@ export interface AnalysisResultData {
   markdown: string;
 }
 
+export interface BriefResultData {
+  structuredData: Record<string, string>;
+  originalResponse: string;
+}
+
 export interface DragDropProps {
   type: 'label' | 'excel';
   accept: string;
@@ -19,3 +24,5 @@ export interface DragDropProps {
   title: string;
   description: string;
 }
+
+export type AppView = 'home' | 'brief' | 'compare' | 'final';
