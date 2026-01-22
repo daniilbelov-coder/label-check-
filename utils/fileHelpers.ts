@@ -47,13 +47,13 @@ export const parseExcelFile = (file: File): Promise<string> => {
                }
 
                try {
-                 // Filter out null/undefined/empty cells to avoid "|||" noise
-                 const rowContent = Array.isArray(row) 
-                   ? row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '').join(" | ") 
-                   : String(row);
-
-                 if (rowContent.trim().length > 0) {
-                   fullText += rowContent + "\n";
+                 // Read ONLY column F (index 5: A=0, B=1, C=2, D=3, E=4, F=5)
+                 if (Array.isArray(row) && row.length > 5) {
+                   const cellF = row[5]; // Column F
+                   
+                   if (cellF !== null && cellF !== undefined && String(cellF).trim() !== '') {
+                     fullText += String(cellF).trim() + "\n";
+                   }
                  }
                } catch (rowError) {
                  console.warn(`Error parsing row ${rowIndex} in sheet ${sheetName}:`, rowError);
@@ -68,7 +68,7 @@ export const parseExcelFile = (file: File): Promise<string> => {
         });
         
         if (fullText.trim().length === 0) {
-           reject(new Error("Файл Excel пуст или не содержит читаемого текста."));
+           reject(new Error("Столбец F пуст или не содержит данных."));
         } else {
            resolve(fullText);
         }
