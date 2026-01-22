@@ -156,12 +156,6 @@ export const addCorrectionColumnToExcel = async (
             // Extract first line only (before \r\n or \n) to match correction keys
             const firstLine = trimmedBlockName.split(/[\r\n]+/)[0].trim();
             
-            // #region agent log
-            if (index >= 19 && index <= 21) {
-              fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:170',message:'Checking problematic rows',data:{rowIndex:index,firstLine:firstLine,firstLineUpper:firstLine.toUpperCase(),availableKeys:Object.keys(corrections).filter(k=>k.toLowerCase().includes('обратная')||k.toUpperCase().includes('ОБРАТНАЯ'))},timestamp:Date.now(),sessionId:'debug-session',runId:'case-check',hypothesisId:'F,G'})}).catch(()=>{});
-            }
-            // #endregion
-            
             // Find matching correction by block name (case-insensitive)
             let correction = corrections[firstLine];
             
@@ -185,12 +179,6 @@ export const addCorrectionColumnToExcel = async (
                 correction = corrections[matchingKey];
               }
             }
-            
-            // #region agent log
-            if (index >= 19 && index <= 21) {
-              fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:190',message:'Match result',data:{rowIndex:index,firstLine:firstLine,correctionFound:!!correction,correctionLength:correction?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'case-check',hypothesisId:'F'})}).catch(()=>{});
-            }
-            // #endregion
             
             if (correction) {
               // Add correction to column G (index 6)
