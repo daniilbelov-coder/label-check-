@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "railway:build": "npm run build",
+    "railway:start": "npm start"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
