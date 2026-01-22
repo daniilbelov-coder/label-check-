@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, RefreshCw, FileSpreadsheet, Download, CheckCircle2, Scan, Wand2 } from 'lucide-react';
 import Dropzone from './Dropzone';
 import { FileData, AppView } from '../types';
-import { parseExcelFile, generateAndDownloadExcel } from '../utils/fileHelpers';
+import { parseExcelFile, generateAndDownloadExcel, addCorrectionColumnToExcel } from '../utils/fileHelpers';
 import { processBrief, BRIEF_SYSTEM_PROMPT } from '../services/geminiService';
 
 interface Props {
@@ -45,9 +45,15 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
     }
   };
 
-  const handleDownload = () => {
-    if (result) {
-      generateAndDownloadExcel(result);
+  const handleDownload = async () => {
+    if (result && file) {
+      try {
+        // Use the new function that adds column G to original file
+        await addCorrectionColumnToExcel(file.file, result);
+      } catch (err) {
+        console.error('Error generating Excel:', err);
+        setError('Ошибка при создании файла Excel');
+      }
     }
   };
 

@@ -112,3 +112,85 @@ export const generateAndDownloadExcel = (data: Record<string, string>, fileName:
   XLSX.utils.book_append_sheet(wb, ws, "Бриф");
   XLSX.writeFile(wb, fileName);
 };
+
+export const addCorrectionColumnToExcel = async (
+  originalFile: File, 
+  corrections: Record<string, string>, 
+  fileName: string = 'brief_corrected.xlsx'
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        // Read the original Excel file
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        
+        // Get the first sheet
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert to JSON to work with data
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+          header: 1, 
+          raw: false,
+          defval: '' // Fill empty cells with empty string
+        });
+        
+        // Add header for column G if it doesn't exist
+        if (jsonData.length > 0 && Array.isArray(jsonData[0])) {
+          const headerRow = jsonData[0] as any[];
+          // Add "Исправленный текст" header in column G (index 6)
+          headerRow[6] = "Исправленный текст";
+        }
+        
+        // Iterate through rows and match block names from column A
+        jsonData.forEach((row: any, index) => {
+          if (index === 0 || !Array.isArray(row)) return; // Skip header row
+          
+          const blockName = row[0]; // Column A
+          
+          if (blockName && typeof blockName === 'string') {
+            // Find matching correction by block name
+            const correction = corrections[blockName.trim()];
+            
+            if (correction) {
+              // Add correction to column G (index 6)
+              row[6] = correction;
+            }
+          }
+        });
+        
+        // Convert back to worksheet
+        const newWorksheet = XLSX.utils.aoa_to_sheet(jsonData);
+        
+        // Set column widths
+        const wscols = [
+          { wch: 30 },  // A
+          { wch: 25 },  // B
+          { wch: 15 },  // C
+          { wch: 15 },  // D
+          { wch: 15 },  // E
+          { wch: 50 },  // F
+          { wch: 50 }   // G - new column
+        ];
+        newWorksheet['!cols'] = wscols;
+        
+        // Create new workbook with modified sheet
+        const newWorkbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, sheetName);
+        
+        // Download file
+        XLSX.writeFile(newWorkbook, fileName);
+        
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    reader.onerror = (error) => reject(error);
+    reader.readAsBinaryString(originalFile);
+  });
+};
