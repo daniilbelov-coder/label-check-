@@ -123,6 +123,10 @@ export const addCorrectionColumnToExcel = async (
     
     reader.onload = (e) => {
       try {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:120',message:'Function entry - corrections received',data:{correctionsKeys:Object.keys(corrections),correctionsCount:Object.keys(corrections).length,firstThreeKeys:Object.keys(corrections).slice(0,3)},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A,C,D'})}).catch(()=>{});
+        // #endregion
+        
         // Read the original Excel file
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
@@ -138,6 +142,10 @@ export const addCorrectionColumnToExcel = async (
           defval: '' // Fill empty cells with empty string
         });
         
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:140',message:'Excel parsed',data:{totalRows:jsonData.length,firstRowSample:jsonData[0],secondRowSample:jsonData[1],thirdRowSample:jsonData[2]},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'B,C'})}).catch(()=>{});
+        // #endregion
+        
         // Add header for column G if it doesn't exist
         if (jsonData.length > 0 && Array.isArray(jsonData[0])) {
           const headerRow = jsonData[0] as any[];
@@ -145,22 +153,48 @@ export const addCorrectionColumnToExcel = async (
           headerRow[6] = "Исправленный текст";
         }
         
+        let matchCount = 0;
+        let noMatchCount = 0;
+        const matchLog: any[] = [];
+        
         // Iterate through rows and match block names from column A
         jsonData.forEach((row: any, index) => {
           if (index === 0 || !Array.isArray(row)) return; // Skip header row
           
           const blockName = row[0]; // Column A
           
+          // #region agent log
+          if (index <= 5) {
+            fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:165',message:'Processing row',data:{rowIndex:index,blockName:blockName,blockNameType:typeof blockName,blockNameTrimmed:blockName?.trim(),rowLength:row.length,rowSample:row.slice(0,3)},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A,B,D'})}).catch(()=>{});
+          }
+          // #endregion
+          
           if (blockName && typeof blockName === 'string') {
+            const trimmedBlockName = blockName.trim();
             // Find matching correction by block name
-            const correction = corrections[blockName.trim()];
+            const correction = corrections[trimmedBlockName];
             
             if (correction) {
               // Add correction to column G (index 6)
               row[6] = correction;
+              matchCount++;
+              if (matchLog.length < 3) {
+                matchLog.push({rowIndex:index,blockName:trimmedBlockName,correctionLength:correction.length,row6Set:true});
+              }
+            } else {
+              noMatchCount++;
+              // #region agent log
+              if (noMatchCount <= 5) {
+                fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:185',message:'No match found',data:{rowIndex:index,blockName:trimmedBlockName,availableKeys:Object.keys(corrections).slice(0,5)},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+              }
+              // #endregion
             }
           }
         });
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:195',message:'Matching complete',data:{matchCount:matchCount,noMatchCount:noMatchCount,matchLog:matchLog,totalProcessed:jsonData.length-1},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A,E'})}).catch(()=>{});
+        // #endregion
         
         // Convert back to worksheet
         const newWorksheet = XLSX.utils.aoa_to_sheet(jsonData);
@@ -181,11 +215,22 @@ export const addCorrectionColumnToExcel = async (
         const newWorkbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, sheetName);
         
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:220',message:'Before XLSX.writeFile',data:{fileName:fileName,worksheetCreated:true,rowsInNewWorksheet:jsonData.length},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        
         // Download file
         XLSX.writeFile(newWorkbook, fileName);
         
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:228',message:'File written successfully',data:{fileName:fileName},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        
         resolve();
       } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/198cdb4c-08de-494a-b8a2-8913ae3460b5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileHelpers.ts:235',message:'Error occurred',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'ALL'})}).catch(()=>{});
+        // #endregion
         reject(error);
       }
     };
