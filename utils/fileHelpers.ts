@@ -47,10 +47,20 @@ export const parseExcelFile = (file: File): Promise<string> => {
                }
 
                try {
-                 // Read ONLY column F (index 5: A=0, B=1, C=2, D=3, E=4, F=5)
-                 if (Array.isArray(row) && row.length > 5) {
-                   const cellF = row[5]; // Column F
+                 // Read column A (block name) and column F (data)
+                 // A=0, B=1, C=2, D=3, E=4, F=5
+                 if (Array.isArray(row)) {
+                   const cellA = row[0]; // Column A - block name
+                   const cellF = row.length > 5 ? row[5] : null; // Column F - data
                    
+                   // If column A has a block name, add it as a header
+                   if (cellA !== null && cellA !== undefined && String(cellA).trim() !== '') {
+                     const blockName = String(cellA).trim();
+                     // Add separator before block name for better parsing
+                     fullText += "\n" + blockName + "\n";
+                   }
+                   
+                   // Add data from column F
                    if (cellF !== null && cellF !== undefined && String(cellF).trim() !== '') {
                      fullText += String(cellF).trim() + "\n";
                    }
