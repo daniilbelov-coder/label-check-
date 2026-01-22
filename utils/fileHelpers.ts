@@ -162,13 +162,24 @@ export const addCorrectionColumnToExcel = async (
             }
             // #endregion
             
-            // Find matching correction by block name
+            // Find matching correction by block name (case-insensitive)
             let correction = corrections[firstLine];
             
-            // If exact match not found, try finding a key that starts with the first line
+            // If exact match not found, try case-insensitive exact match
+            if (!correction) {
+              const caseInsensitiveKey = Object.keys(corrections).find(key => 
+                key.toUpperCase() === firstLine.toUpperCase()
+              );
+              if (caseInsensitiveKey) {
+                correction = corrections[caseInsensitiveKey];
+              }
+            }
+            
+            // If still no match, try finding a key that starts with the first line (case-insensitive)
             if (!correction) {
               const matchingKey = Object.keys(corrections).find(key => 
-                firstLine.startsWith(key) || key.startsWith(firstLine)
+                firstLine.toUpperCase().startsWith(key.toUpperCase()) || 
+                key.toUpperCase().startsWith(firstLine.toUpperCase())
               );
               if (matchingKey) {
                 correction = corrections[matchingKey];
