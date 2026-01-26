@@ -2,15 +2,17 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createAIProvider } from './services/aiProviders.js';
+import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
+const YANDEX_API_KEY = process.env.YANDEX_CLOUD_API_KEY;
+const YANDEX_FOLDER_ID = process.env.YANDEX_CLOUD_FOLDER;
 
-// Google Gemini 2.5 Flash on Replicate
-const MODEL_VERSION = 'bfb7df9586ae4fafa00a593d8dc4868698f72cf9d695da28b8c8a70f88e876ba';
 
 const mimeTypes = {
   '.html': 'text/html',
@@ -24,55 +26,15 @@ const mimeTypes = {
   '.woff2': 'font/woff2',
 };
 
-// Wait for Replicate prediction to complete
-async function waitForPrediction(predictionId) {
-  const maxAttempts = 180; // 6 minutes max
-  for (let i = 0; i < maxAttempts; i++) {
-    const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-      headers: { 'Authorization': `Bearer ${REPLICATE_API_KEY}` },
-    });
-    const prediction = await response.json();
-    
-    if (prediction.status === 'succeeded') {
-      return prediction.output;
-    } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
-      throw new Error(prediction.error || 'Prediction failed');
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  throw new Error('Prediction timeout');
-}
-
-// Generic Gemini call helper
-async function callGemini({ prompt, systemPrompt, images = [], responseFormat = null }) {
-  const input = {
-    prompt,
-    temperature: 0.1,
-    max_output_tokens: 8192,
-  };
-  
-  if (systemPrompt) input.system_instruction = systemPrompt;
-  if (images.length > 0) input.images = images;
-
-  const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${REPLICATE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ version: MODEL_VERSION, input }),
+// Unified AI call helper
+async function callAI({ prompt, systemPrompt, images = [], modelId = DEFAULT_MODEL }) {
+  const provider = createAIProvider(modelId, {
+    replicateApiKey: REPLICATE_API_KEY,
+    yandexApiKey: YANDEX_API_KEY,
+    yandexFolderId: YANDEX_FOLDER_ID
   });
 
-  if (!createResponse.ok) {
-    const errorText = await createResponse.text();
-    throw new Error(`Replicate API Error: ${errorText}`);
-  }
-
-  const prediction = await createResponse.json();
-  const output = await waitForPrediction(prediction.id);
-  
-  return typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
+  return await provider.generateText({ prompt, systemPrompt, images });
 }
 
 // Parse request body
@@ -95,16 +57,41 @@ function sendJSON(res, statusCode, data) {
 }
 
 const server = http.createServer(async (req, res) => {
-  
+
+  // ===== API: GET AVAILABLE MODELS =====
+  if (req.method === 'GET' && req.url === '/api/available-models') {
+    try {
+      // Filter models based on available API keys
+      const availableModels = ALL_MODELS.filter(model => {
+        if (model.provider === 'replicate') {
+          return !!REPLICATE_API_KEY;
+        } else if (model.provider === 'yandex') {
+          return !!YANDEX_API_KEY && !!YANDEX_FOLDER_ID;
+        }
+        return false;
+      });
+
+      sendJSON(res, 200, {
+        models: availableModels,
+        defaultModel: DEFAULT_MODEL
+      });
+    } catch (err) {
+      console.error('Available Models API Error:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
   // ===== API: BRIEF PROCESSING (text only) =====
   if (req.method === 'POST' && req.url === '/api/brief') {
     try {
-      const { text, systemPrompt } = await parseBody(req);
-      console.log('Processing brief...');
-      
-      const result = await callGemini({
+      const { text, systemPrompt, modelId } = await parseBody(req);
+      console.log('Processing brief with model:', modelId || DEFAULT_MODEL);
+
+      const result = await callAI({
         prompt: `Обработай следующий текст брифа согласно инструкциям и верни результат СТРОГО в формате JSON:\n\n${text}`,
         systemPrompt,
+        modelId: modelId || DEFAULT_MODEL
       });
       
       // Try to parse JSON from response
@@ -131,11 +118,12 @@ const server = http.createServer(async (req, res) => {
     try {
       const { imageUrl, text, systemPrompt } = await parseBody(req);
       console.log('Analyzing label...');
-      
-      const result = await callGemini({
+
+      const result = await callAI({
         prompt: `ЭТАЛОН (EXCEL):\n${text}\n\nСравни это с изображением. Будь педантичен к регистру букв.`,
         systemPrompt,
         images: [imageUrl],
+        modelId: 'gemini-2.5-flash' // Only Gemini supports images
       });
       
       sendJSON(res, 200, { result });
@@ -151,11 +139,12 @@ const server = http.createServer(async (req, res) => {
     try {
       const { imageUrl, systemPrompt } = await parseBody(req);
       console.log('Proofreading label...');
-      
-      const result = await callGemini({
+
+      const result = await callAI({
         prompt: 'Найди все орфографические и пунктуационные ошибки на изображении.',
         systemPrompt,
         images: [imageUrl],
+        modelId: 'gemini-2.5-flash' // Only Gemini supports images
       });
       
       sendJSON(res, 200, { result });

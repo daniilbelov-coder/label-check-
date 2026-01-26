@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
-import { ArrowLeft, RefreshCw, FileSpreadsheet, Download, CheckCircle2, Scan, Wand2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, RefreshCw, FileSpreadsheet, Download, CheckCircle2, Scan, Wand2, Cpu } from 'lucide-react';
 import Dropzone from './Dropzone';
 import { FileData, AppView } from '../types';
 import { parseExcelFile, generateAndDownloadExcel, addCorrectionColumnToExcel } from '../utils/fileHelpers';
 import { processBrief, BRIEF_SYSTEM_PROMPT } from '../services/geminiService';
+
+interface ModelConfig {
+  id: string;
+  name: string;
+  displayName: string;
+  provider: string;
+  description?: string;
+}
 
 interface Props {
   onBack: () => void;
@@ -16,6 +24,35 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
   const [result, setResult] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string>("");
+  const [availableModels, setAvailableModels] = useState<ModelConfig[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+
+  // Load available models from server
+  useEffect(() => {
+    const fetchAvailableModels = async () => {
+      try {
+        const response = await fetch('/api/available-models');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableModels(data.models || []);
+          if (data.defaultModel) {
+            setSelectedModel(data.defaultModel);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load available models:', err);
+        // Fallback to Gemini if API fails
+        setAvailableModels([{
+          id: 'gemini-2.5-flash',
+          name: 'gemini-2.5-flash',
+          displayName: 'Google Gemini 2.5 Flash',
+          provider: 'replicate',
+          description: 'Быстрая модель (через Replicate)'
+        }]);
+      }
+    };
+    fetchAvailableModels();
+  }, []);
 
   const handleFileSelect = async (selectedFile: File) => {
     try {
@@ -36,7 +73,7 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
     setIsProcessing(true);
     setError(null);
     try {
-      const data = await processBrief(file.content, systemPrompt || undefined);
+      const data = await processBrief(file.content, systemPrompt || undefined, selectedModel);
       setResult(data);
     } catch (err: any) {
       setError(err.message || "Ошибка обработки");
@@ -85,6 +122,37 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
           Загрузите Excel файл с исходным текстом. ИИ автоматически скорректирует кавычки, тире, регистр и исправит ошибки.
         </p>
       </div>
+
+      {/* Model Selection Dropdown */}
+      {availableModels.length > 1 && (
+        <div className="max-w-md mx-auto mb-8">
+          <div className="glass-card rounded-2xl p-1">
+            <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-brand-50 dark:bg-brand-900/30 rounded-lg flex items-center justify-center">
+                  <Cpu size={16} className="text-brand-600 dark:text-brand-400" />
+                </div>
+                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  AI Модель
+                </h3>
+              </div>
+
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all cursor-pointer"
+              >
+                {availableModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.displayName}
+                    {model.description && ` — ${model.description}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!result ? (
         <div className="flex flex-col items-center">

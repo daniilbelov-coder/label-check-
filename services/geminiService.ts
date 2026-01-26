@@ -148,7 +148,8 @@ const FINAL_CHECK_SYSTEM_PROMPT = `
 // --- SERVICE 1: BRIEF PROCESSING ---
 export const processBrief = async (
   excelText: string,
-  customSystemPrompt?: string
+  customSystemPrompt?: string,
+  modelId?: string
 ): Promise<Record<string, string>> => {
   const response = await fetch('/api/brief', {
     method: 'POST',
@@ -156,6 +157,7 @@ export const processBrief = async (
     body: JSON.stringify({
       text: excelText,
       systemPrompt: customSystemPrompt || BRIEF_SYSTEM_PROMPT,
+      modelId: modelId || 'gemini-2.5-flash'
     }),
   });
 
