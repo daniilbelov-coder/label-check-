@@ -1,14 +1,7 @@
-export type ModelProvider = 'replicate' | 'yandex';
+// AI Model Configuration
+// This file defines available AI models and providers
 
-export interface ModelConfig {
-  id: string;
-  name: string;
-  displayName: string;
-  provider: ModelProvider;
-  description?: string;
-}
-
-export const ALL_MODELS: ModelConfig[] = [
+export const ALL_MODELS = [
   {
     id: 'gemini-2.5-flash',
     name: 'gemini-2.5-flash',
