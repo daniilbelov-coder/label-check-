@@ -81,7 +81,7 @@ class YandexProvider extends AIProvider {
       throw new Error('Yandex models do not support image inputs');
     }
 
-    const modelUri = `gpt://${this.folderId}/${this.modelName}`;
+    const modelUri = `gpt://${this.folderId}/${this.modelName}/latest`;
 
     const messages = [];
     if (systemPrompt) {
