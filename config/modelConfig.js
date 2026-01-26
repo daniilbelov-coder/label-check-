@@ -17,11 +17,11 @@ export const ALL_MODELS = [
     description: 'Базовая модель Yandex'
   },
   {
-    id: 'yandexgpt-pro',
-    name: 'yandexgpt-pro',
-    displayName: 'YandexGPT Pro',
+    id: 'yandexgpt-lite',
+    name: 'yandexgpt-lite',
+    displayName: 'YandexGPT Lite',
     provider: 'yandex',
-    description: 'Продвинутая модель Yandex'
+    description: 'Облегченная модель Yandex'
   }
 ];
 
