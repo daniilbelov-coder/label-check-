@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
-import { ArrowLeft, RefreshCw, ScanEye, AlertTriangle, Scan } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, RefreshCw, ScanEye, AlertTriangle, Scan, Cpu } from 'lucide-react';
 import Dropzone from './Dropzone';
 import AnalysisResult from './AnalysisResult';
 import { FileData, AnalysisResultData, AppView } from '../types';
 import { fileToBase64, createPreviewUrl } from '../utils/fileHelpers';
 import { proofreadLabel } from '../services/geminiService';
+
+interface ModelConfig {
+  id: string;
+  model: string;
+  displayName: string;
+  provider: string;
+  description?: string;
+  capabilities?: { images?: boolean; systemPrompt?: boolean };
+}
 
 interface Props {
   onBack: () => void;
@@ -16,6 +25,27 @@ const FinalCheck: React.FC<Props> = ({ onBack, onNavigate }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<AnalysisResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<ModelConfig[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+
+  // Load available models that support images
+  useEffect(() => {
+    const fetchAvailableModels = async () => {
+      try {
+        const response = await fetch('/api/available-models?filter=images');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableModels(data.models || []);
+          if (data.defaultModel) {
+            setSelectedModel(data.defaultModel);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load available models:', err);
+      }
+    };
+    fetchAvailableModels();
+  }, []);
 
   const handleFileSelect = (selectedFile: File) => {
     try {
@@ -31,7 +61,7 @@ const FinalCheck: React.FC<Props> = ({ onBack, onNavigate }) => {
     setResult(null);
     try {
       const base64 = await fileToBase64(file.file);
-      const text = await proofreadLabel(base64, file.file.type);
+      const text = await proofreadLabel(base64, file.file.type, selectedModel);
       setResult({ markdown: text });
     } catch (err: any) {
       setError(err.message || "Ошибка проверки");
@@ -64,6 +94,37 @@ const FinalCheck: React.FC<Props> = ({ onBack, onNavigate }) => {
           Поиск орфографических, пунктуационных и оформительских ошибок на готовой этикетке без сравнения с исходником.
         </p>
       </div>
+
+      {/* Model Selection Dropdown */}
+      {availableModels.length > 1 && (
+        <div className="max-w-md mx-auto mb-8">
+          <div className="glass-card rounded-2xl p-1">
+            <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-brand-50 dark:bg-brand-900/30 rounded-lg flex items-center justify-center">
+                  <Cpu size={16} className="text-brand-600 dark:text-brand-400" />
+                </div>
+                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  AI Модель
+                </h3>
+              </div>
+
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all cursor-pointer"
+              >
+                {availableModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.displayName}
+                    {model.description && ` — ${model.description}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="max-w-2xl mx-auto bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl text-red-600 dark:text-red-400 flex gap-3 mb-8 animate-fade-in">

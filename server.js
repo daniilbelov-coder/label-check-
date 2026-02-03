@@ -59,10 +59,14 @@ function sendJSON(res, statusCode, data) {
 const server = http.createServer(async (req, res) => {
 
   // ===== API: GET AVAILABLE MODELS =====
-  if (req.method === 'GET' && req.url === '/api/available-models') {
+  if (req.method === 'GET' && req.url?.startsWith('/api/available-models')) {
     try {
+      // Parse query parameters
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      const filter = urlObj.searchParams.get('filter');
+
       // Filter models based on available API keys
-      const availableModels = ALL_MODELS.filter(model => {
+      let availableModels = ALL_MODELS.filter(model => {
         if (model.provider === 'replicate') {
           return !!REPLICATE_API_KEY;
         } else if (model.provider === 'yandex') {
@@ -71,9 +75,18 @@ const server = http.createServer(async (req, res) => {
         return false;
       });
 
+      // Apply capability filter if specified
+      if (filter === 'images') {
+        availableModels = availableModels.filter(m => m.capabilities?.images);
+      } else if (filter === 'text') {
+        // All models support text, no additional filtering needed
+      }
+
       sendJSON(res, 200, {
         models: availableModels,
-        defaultModel: DEFAULT_MODEL
+        defaultModel: filter === 'images' 
+          ? availableModels.find(m => m.capabilities?.images)?.id || DEFAULT_MODEL
+          : DEFAULT_MODEL
       });
     } catch (err) {
       console.error('Available Models API Error:', err.message);
@@ -116,14 +129,22 @@ const server = http.createServer(async (req, res) => {
   // ===== API: LABEL COMPARISON (image + text) =====
   if (req.method === 'POST' && req.url === '/api/analyze') {
     try {
-      const { imageUrl, text, systemPrompt } = await parseBody(req);
-      console.log('Analyzing label...');
+      const { imageUrl, text, systemPrompt, modelId } = await parseBody(req);
+      
+      // Validate model supports images
+      const selectedModelId = modelId || DEFAULT_MODEL;
+      const modelConfig = ALL_MODELS.find(m => m.id === selectedModelId);
+      if (modelConfig && !modelConfig.capabilities?.images) {
+        throw new Error(`Model ${selectedModelId} does not support image analysis`);
+      }
+      
+      console.log('Analyzing label with model:', selectedModelId);
 
       const result = await callAI({
         prompt: `ЭТАЛОН (EXCEL):\n${text}\n\nСравни это с изображением. Будь педантичен к регистру букв.`,
         systemPrompt,
         images: [imageUrl],
-        modelId: 'gemini-2.5-flash' // Only Gemini supports images
+        modelId: selectedModelId
       });
       
       sendJSON(res, 200, { result });
@@ -137,14 +158,22 @@ const server = http.createServer(async (req, res) => {
   // ===== API: FINAL PROOFREAD (image only) =====
   if (req.method === 'POST' && req.url === '/api/proofread') {
     try {
-      const { imageUrl, systemPrompt } = await parseBody(req);
-      console.log('Proofreading label...');
+      const { imageUrl, systemPrompt, modelId } = await parseBody(req);
+      
+      // Validate model supports images
+      const selectedModelId = modelId || DEFAULT_MODEL;
+      const modelConfig = ALL_MODELS.find(m => m.id === selectedModelId);
+      if (modelConfig && !modelConfig.capabilities?.images) {
+        throw new Error(`Model ${selectedModelId} does not support image analysis`);
+      }
+      
+      console.log('Proofreading label with model:', selectedModelId);
 
       const result = await callAI({
         prompt: 'Найди все орфографические и пунктуационные ошибки на изображении.',
         systemPrompt,
         images: [imageUrl],
-        modelId: 'gemini-2.5-flash' // Only Gemini supports images
+        modelId: selectedModelId
       });
       
       sendJSON(res, 200, { result });

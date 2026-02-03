@@ -174,7 +174,8 @@ export const processBrief = async (
 export const analyzeLabel = async (
   labelBase64: string,
   labelMimeType: string,
-  excelText: string
+  excelText: string,
+  modelId?: string
 ): Promise<string> => {
   const imageUrl = `data:${labelMimeType};base64,${labelBase64}`;
   
@@ -185,6 +186,7 @@ export const analyzeLabel = async (
       imageUrl,
       text: excelText,
       systemPrompt: COMPARISON_SYSTEM_PROMPT,
+      modelId,
     }),
   });
 
@@ -200,7 +202,8 @@ export const analyzeLabel = async (
 // --- SERVICE 3: FINAL CHECK ---
 export const proofreadLabel = async (
   labelBase64: string,
-  labelMimeType: string
+  labelMimeType: string,
+  modelId?: string
 ): Promise<string> => {
   const imageUrl = `data:${labelMimeType};base64,${labelBase64}`;
   
@@ -210,6 +213,7 @@ export const proofreadLabel = async (
     body: JSON.stringify({
       imageUrl,
       systemPrompt: FINAL_CHECK_SYSTEM_PROMPT,
+      modelId,
     }),
   });
 
