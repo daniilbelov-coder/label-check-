@@ -4,10 +4,11 @@ import Dropzone from './Dropzone';
 import { FileData, AppView } from '../types';
 import { parseExcelFile, generateAndDownloadExcel, addCorrectionColumnToExcel } from '../utils/fileHelpers';
 import { processBrief, BRIEF_SYSTEM_PROMPT } from '../services/geminiService';
+import { ALL_MODELS, DEFAULT_MODEL } from '../config/modelConfig';
 
 interface ModelConfig {
   id: string;
-  name: string;
+  name?: string;
   displayName: string;
   provider: string;
   description?: string;
@@ -24,8 +25,8 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
   const [result, setResult] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string>("");
-  const [availableModels, setAvailableModels] = useState<ModelConfig[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [availableModels, setAvailableModels] = useState<ModelConfig[]>(ALL_MODELS as unknown as ModelConfig[]);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
 
   // Load available models from server
   useEffect(() => {
