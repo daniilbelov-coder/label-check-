@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, FileSpreadsheet, Download, CheckCircle2, Scan, Wand2, Cpu } from 'lucide-react';
+import { ArrowLeft, RefreshCw, FileSpreadsheet, Download, CheckCircle2, Scan, Cpu } from 'lucide-react';
 import Dropzone from './Dropzone';
-import { FileData, AppView } from '../types';
-import { parseExcelFile, generateAndDownloadExcel, addCorrectionColumnToExcel } from '../utils/fileHelpers';
-import { processBrief, BRIEF_SYSTEM_PROMPT } from '../services/geminiService';
+import { FileData, AppView, BriefType } from '../types';
+import { parseExcelFile, addCorrectionColumnToExcel } from '../utils/fileHelpers';
+import { processBrief, BRIEF_PROMPTS } from '../services/geminiService';
 import { ALL_MODELS, DEFAULT_MODEL } from '../config/modelConfig';
 
 interface ModelConfig {
@@ -19,12 +19,20 @@ interface Props {
   onNavigate: (view: AppView) => void;
 }
 
+// Конфигурация типов брифов
+const BRIEF_TYPES: { id: BriefType; label: string }[] = [
+  { id: 'food', label: 'Фуд' },
+  { id: 'nonfood', label: 'Нон-фуд' },
+  { id: 'inter', label: 'Межнар' },
+  { id: 'ge', label: 'ГЕ' },
+];
+
 const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
   const [file, setFile] = useState<FileData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [systemPrompt, setSystemPrompt] = useState<string>("");
+  const [selectedBriefType, setSelectedBriefType] = useState<BriefType | null>(null);
   const [availableModels, setAvailableModels] = useState<ModelConfig[]>(ALL_MODELS as unknown as ModelConfig[]);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
 
@@ -70,11 +78,12 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
   };
 
   const handleProcess = async () => {
-    if (!file || !file.content) return;
+    if (!file || !file.content || !selectedBriefType) return;
     setIsProcessing(true);
     setError(null);
     try {
-      const data = await processBrief(file.content, systemPrompt || undefined, selectedModel);
+      const prompt = BRIEF_PROMPTS[selectedBriefType];
+      const data = await processBrief(file.content, prompt, selectedModel);
       setResult(data);
     } catch (err: any) {
       setError(err.message || "Ошибка обработки");
@@ -93,10 +102,6 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
         setError('Ошибка при создании файла Excel');
       }
     }
-  };
-
-  const useDefaultPrompt = () => {
-    setSystemPrompt(BRIEF_SYSTEM_PROMPT.trim());
   };
 
   return (
@@ -124,66 +129,70 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
         </p>
       </div>
 
-      {/* Model Selection Dropdown */}
-      {availableModels.length > 1 && (
-        <div className="max-w-md mx-auto mb-8">
-          <div className="glass-card rounded-2xl p-1">
-            <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 bg-brand-50 dark:bg-brand-900/30 rounded-lg flex items-center justify-center">
-                  <Cpu size={16} className="text-brand-600 dark:text-brand-400" />
-                </div>
-                <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  AI Модель
-                </h3>
-              </div>
-
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all cursor-pointer"
-              >
-                {availableModels.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.displayName}
-                    {model.description && ` — ${model.description}`}
-                  </option>
+      {/* Brief Type & Model Selection Row */}
+      <div className="max-w-4xl mx-auto mb-8">
+        <div className="flex flex-col md:flex-row gap-4 items-stretch">
+          {/* Brief Type Buttons */}
+          <div className="flex-1 glass-card rounded-2xl p-1">
+            <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4 h-full">
+              <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">
+                Тип брифа
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {BRIEF_TYPES.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => setSelectedBriefType(type.id)}
+                    className={`
+                      px-5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200
+                      ${selectedBriefType === type.id
+                        ? 'bg-brand-500 text-white shadow-md'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'
+                      }
+                    `}
+                  >
+                    {type.label}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
           </div>
+
+          {/* Model Selection Dropdown */}
+          {availableModels.length > 1 && (
+            <div className="md:w-72 glass-card rounded-2xl p-1">
+              <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4 h-full">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-6 h-6 bg-brand-50 dark:bg-brand-900/30 rounded-lg flex items-center justify-center">
+                    <Cpu size={14} className="text-brand-600 dark:text-brand-400" />
+                  </div>
+                  <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                    AI Модель
+                  </h3>
+                </div>
+
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all cursor-pointer"
+                >
+                  {availableModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.displayName}
+                      {model.description && ` — ${model.description}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {!result ? (
         <div className="flex flex-col items-center">
-          <div className="w-full grid lg:grid-cols-[1fr,1.2fr] gap-8 max-w-6xl mx-auto mb-12">
-            
-            {/* System Prompt Section */}
-            <div className="flex flex-col h-full animate-fade-in">
-                <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4 ml-1">
-                  СИСТЕМНЫЙ ПРОМПТ
-                </h3>
-                <div className="flex-grow bg-white dark:bg-slate-900 rounded-[32px] shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 p-6 overflow-hidden min-h-[320px] mb-4">
-                  <textarea
-                    value={systemPrompt}
-                    onChange={(e) => setSystemPrompt(e.target.value)}
-                    placeholder="Введите правила обработки или используйте стандартные..."
-                    className="w-full h-full resize-none bg-transparent text-slate-700 dark:text-slate-300 text-sm leading-relaxed focus:outline-none scrollbar-thin"
-                  />
-                </div>
-                <div className="flex justify-start">
-                  <button
-                    onClick={useDefaultPrompt}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-400 font-bold text-xs hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-all border border-slate-200 dark:border-slate-800 shadow-sm"
-                  >
-                    <Wand2 size={14} />
-                    Использовать стандартные правила
-                  </button>
-                </div>
-            </div>
-
-            {/* File Upload Section */}
+          {/* File Upload Section - Centered */}
+          <div className="w-full max-w-xl mx-auto mb-12">
             <Dropzone
               type="excel"
               accept=".xlsx, .xls"
@@ -198,10 +207,10 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
           <div className="flex justify-center pb-20">
             <button
               onClick={handleProcess}
-              disabled={!file || isProcessing}
+              disabled={!file || !selectedBriefType || isProcessing}
               className={`
                 group relative px-10 py-5 rounded-full font-bold text-base flex items-center gap-3 shadow-xl transition-all duration-300
-                ${!file || isProcessing
+                ${!file || !selectedBriefType || isProcessing
                   ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none' 
                   : 'bg-slate-900 dark:bg-brand-600 text-white hover:bg-brand-600 dark:hover:bg-brand-500 hover:scale-[1.02] active:scale-[0.98]'
                 }
