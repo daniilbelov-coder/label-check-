@@ -8,7 +8,7 @@ export const ALL_MODELS = [
     model: 'google/gemini-2.5-flash',
     displayName: 'Google Gemini 2.5 Flash',
     provider: 'replicate',
-    description: 'Быстрая модель (через Replicate)',
+    description: 'быстрая модель',
     capabilities: { images: true, systemPrompt: true },
     inputMapping: {
       systemPrompt: 'system_instruction',

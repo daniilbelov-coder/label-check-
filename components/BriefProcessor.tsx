@@ -133,7 +133,7 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
       <div className="max-w-4xl mx-auto mb-8">
         <div className="flex flex-col md:flex-row gap-4 items-stretch">
           {/* Brief Type Buttons */}
-          <div className="flex-1 glass-card rounded-2xl p-1">
+          <div className="shrink-0 glass-card rounded-2xl p-1">
             <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4 h-full">
               <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">
                 Тип брифа
@@ -160,7 +160,7 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
 
           {/* Model Selection Dropdown */}
           {availableModels.length > 1 && (
-            <div className="md:w-72 glass-card rounded-2xl p-1">
+            <div className="flex-1 min-w-0 glass-card rounded-2xl p-1">
               <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4 h-full">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-6 h-6 bg-brand-50 dark:bg-brand-900/30 rounded-lg flex items-center justify-center">
@@ -192,7 +192,7 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
       {!result ? (
         <div className="flex flex-col items-center">
           {/* File Upload Section - Centered */}
-          <div className="w-full max-w-xl mx-auto mb-12">
+          <div className="w-full max-w-4xl mx-auto mb-12">
             <Dropzone
               type="excel"
               accept=".xlsx, .xls"

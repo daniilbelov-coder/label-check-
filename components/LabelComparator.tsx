@@ -5,6 +5,7 @@ import AnalysisResult from './AnalysisResult';
 import { FileData, AnalysisResultData, AppView } from '../types';
 import { fileToBase64, parseExcelFile, createPreviewUrl } from '../utils/fileHelpers';
 import { analyzeLabel } from '../services/geminiService';
+import { ALL_MODELS, DEFAULT_MODEL } from '../config/modelConfig';
 
 interface ModelConfig {
   id: string;
@@ -26,8 +27,8 @@ const LabelComparator: React.FC<Props> = ({ onBack, onNavigate }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<ModelConfig[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [availableModels, setAvailableModels] = useState<ModelConfig[]>(ALL_MODELS as unknown as ModelConfig[]);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
 
   // Load available models that support images
   useEffect(() => {
