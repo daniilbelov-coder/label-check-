@@ -7,12 +7,12 @@ class AIProvider {
   }
 }
 
-// Replicate Provider (supports multiple models via Replicate API)
+// Replicate Provider (Google Gemini via Replicate)
 class ReplicateProvider extends AIProvider {
-  constructor(apiKey, modelConfig) {
+  constructor(apiKey) {
     super();
     this.apiKey = apiKey;
-    this.modelConfig = modelConfig;
+    this.modelVersion = 'bfb7df9586ae4fafa00a593d8dc4868698f72cf9d695da28b8c8a70f88e876ba';
   }
 
   async waitForPrediction(predictionId) {
@@ -35,82 +35,31 @@ class ReplicateProvider extends AIProvider {
   }
 
   async generateText({ prompt, systemPrompt, images = [] }) {
-    const { model, inputMapping, capabilities } = this.modelConfig;
-
-    // Build input with dynamic mapping
     const input = {
       prompt,
       temperature: 0.1,
+      max_output_tokens: 8192,
     };
 
-    // Handle system prompt
-    if (systemPrompt) {
-      if (capabilities.systemPrompt && inputMapping.systemPrompt) {
-        // Model supports system prompt natively
-        input[inputMapping.systemPrompt] = systemPrompt;
-      } else {
-        // Model doesn't support system prompt - prepend to user prompt
-        input.prompt = `${systemPrompt}\n\n---\n\n${prompt}`;
-      }
-    }
+    if (systemPrompt) input.system_instruction = systemPrompt;
+    if (images.length > 0) input.images = images;
 
-    // Handle images
-    if (images.length > 0) {
-      if (capabilities.images && inputMapping.images) {
-        input[inputMapping.images] = images;
-      } else {
-        throw new Error(`Model ${model} does not support image inputs`);
-      }
-    }
-
-    // Set max tokens with model-specific key
-    if (inputMapping.maxTokens) {
-      input[inputMapping.maxTokens] = 8192;
-    }
-
-    // Use model identifier endpoint (owner/model-name)
-    const apiUrl = `https://api.replicate.com/v1/models/${model}/predictions`;
-
-    const createResponse = await fetch(apiUrl, {
+    const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
-        'Prefer': 'wait',
       },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ version: this.modelVersion, input }),
     });
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      let errorMessage = errorText;
-
-      // Try to parse JSON error response from Replicate
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.detail || errorJson.error || errorText;
-      } catch (e) {
-        // If not JSON, use raw text
-      }
-
-      throw new Error(
-        `Replicate API Error (${model}): HTTP ${createResponse.status} - ${errorMessage}`
-      );
+      throw new Error(`Replicate API Error: ${errorText}`);
     }
 
     const prediction = await createResponse.json();
-
-    // If prediction is still processing, poll for result
-    let output;
-    if (prediction.status === 'succeeded') {
-      output = prediction.output;
-    } else if (prediction.status === 'processing' || prediction.status === 'starting') {
-      output = await this.waitForPrediction(prediction.id);
-    } else if (prediction.status === 'failed') {
-      throw new Error(prediction.error || 'Prediction failed');
-    } else {
-      output = await this.waitForPrediction(prediction.id);
-    }
+    const output = await this.waitForPrediction(prediction.id);
 
     return typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
   }
@@ -169,26 +118,26 @@ class YandexProvider extends AIProvider {
 
 // Provider Factory
 export function createAIProvider(modelId, config) {
-  const modelConfig = AVAILABLE_MODELS.find(m => m.id === modelId);
+  const model = AVAILABLE_MODELS.find(m => m.id === modelId);
 
-  if (!modelConfig) {
+  if (!model) {
     throw new Error(`Unknown model: ${modelId}`);
   }
 
-  if (modelConfig.provider === 'replicate') {
+  if (model.provider === 'replicate') {
     if (!config.replicateApiKey) {
-      throw new Error('REPLICATE_API_KEY is required for Replicate models');
+      throw new Error('REPLICATE_API_KEY is required for Gemini models');
     }
-    return new ReplicateProvider(config.replicateApiKey, modelConfig);
-  } else if (modelConfig.provider === 'yandex') {
+    return new ReplicateProvider(config.replicateApiKey);
+  } else if (model.provider === 'yandex') {
     if (!config.yandexApiKey) {
       throw new Error('YANDEX_CLOUD_API_KEY is required for Yandex models');
     }
     if (!config.yandexFolderId) {
       throw new Error('YANDEX_CLOUD_FOLDER is required for Yandex models');
     }
-    return new YandexProvider(config.yandexApiKey, config.yandexFolderId, modelConfig.model);
+    return new YandexProvider(config.yandexApiKey, config.yandexFolderId, model.model);
   }
 
-  throw new Error(`Unknown provider: ${modelConfig.provider}`);
+  throw new Error(`Unknown provider: ${model.provider}`);
 }

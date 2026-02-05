@@ -188,18 +188,15 @@ const server = http.createServer(async (req, res) => {
         return false;
       });
 
-      // Apply capability filter if specified
+      // Apply filter if specified
       if (filter === 'images') {
-        availableModels = availableModels.filter(m => m.capabilities?.images);
-      } else if (filter === 'text') {
-        // All models support text, no additional filtering needed
+        // Gemini supports images
+        availableModels = availableModels.filter(m => m.provider === 'replicate');
       }
 
       sendJSON(res, 200, {
         models: availableModels,
-        defaultModel: filter === 'images' 
-          ? availableModels.find(m => m.capabilities?.images)?.id || DEFAULT_MODEL
-          : DEFAULT_MODEL
+        defaultModel: DEFAULT_MODEL
       });
     } catch (err) {
       console.error('Available Models API Error:', err.message);

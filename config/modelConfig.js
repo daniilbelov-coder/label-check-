@@ -2,38 +2,28 @@
 // This file defines available AI models and providers
 
 export const ALL_MODELS = [
-  // Yandex models (positioned first) - WORKING
+  // Yandex models (positioned first)
   {
     id: 'yandexgpt',
     model: 'yandexgpt',
     displayName: 'YandexGPT',
     provider: 'yandex',
-    description: 'Базовая модель Yandex',
-    capabilities: { images: false, systemPrompt: true },
-    inputMapping: {}
+    description: 'Базовая модель Yandex'
   },
   {
     id: 'yandexgpt-lite',
     model: 'yandexgpt-lite',
     displayName: 'YandexGPT Lite',
     provider: 'yandex',
-    description: 'Облегченная модель Yandex',
-    capabilities: { images: false, systemPrompt: true },
-    inputMapping: {}
+    description: 'Облегченная модель Yandex'
   },
-  // OpenAI GPT-5 Nano (via Replicate)
+  // Google Gemini 2.5 Flash (via Replicate)
   {
-    id: 'gpt-5-nano',
-    model: 'openai/gpt-5-nano',
-    displayName: 'OpenAI GPT-5 Nano',
+    id: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash',
+    displayName: 'Google Gemini 2.5 Flash',
     provider: 'replicate',
-    description: 'Быстрая GPT-5',
-    capabilities: { images: true, systemPrompt: true },
-    inputMapping: {
-      systemPrompt: 'system_prompt',
-      images: 'image_input',
-      maxTokens: 'max_completion_tokens'
-    }
+    description: 'Быстрая модель (через Replicate)'
   }
 ];
 
