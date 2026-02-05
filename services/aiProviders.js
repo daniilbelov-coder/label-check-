@@ -64,8 +64,9 @@ class ReplicateProvider extends AIProvider {
     }
 
     // Set max tokens with model-specific key
+    // Use maximum available tokens for better results
     if (inputMapping.maxTokens) {
-      input[inputMapping.maxTokens] = 8192;
+      input[inputMapping.maxTokens] = 65535; // Gemini supports up to 65535 output tokens
     }
 
     // Use model identifier endpoint (owner/model-name)
