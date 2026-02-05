@@ -3,7 +3,7 @@ import { ArrowLeft, RefreshCw, FileSpreadsheet, Download, CheckCircle2, Scan, Cp
 import Dropzone from './Dropzone';
 import { FileData, AppView, BriefType } from '../types';
 import { parseExcelFile, addCorrectionColumnToExcel } from '../utils/fileHelpers';
-import { processBrief, BRIEF_PROMPTS } from '../services/geminiService';
+import { processBrief, getAvailableModels } from '../services/geminiService';
 import { ALL_MODELS, DEFAULT_MODEL } from '../config/modelConfig';
 
 interface ModelConfig {
@@ -38,15 +38,12 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
 
   // Load available models from server
   useEffect(() => {
-    const fetchAvailableModels = async () => {
+    const fetchModels = async () => {
       try {
-        const response = await fetch('/api/available-models');
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableModels(data.models || []);
-          if (data.defaultModel) {
-            setSelectedModel(data.defaultModel);
-          }
+        const data = await getAvailableModels();
+        setAvailableModels(data.models || []);
+        if (data.defaultModel) {
+          setSelectedModel(data.defaultModel);
         }
       } catch (err) {
         console.error('Failed to load available models:', err);
@@ -60,7 +57,7 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
         }]);
       }
     };
-    fetchAvailableModels();
+    fetchModels();
   }, []);
 
   const handleFileSelect = async (selectedFile: File) => {
@@ -82,8 +79,8 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
     setIsProcessing(true);
     setError(null);
     try {
-      const prompt = BRIEF_PROMPTS[selectedBriefType];
-      const data = await processBrief(file.content, prompt, selectedModel);
+      // Просто передаем тип, промпт выберет сервер
+      const data = await processBrief(file.content, selectedBriefType, selectedModel);
       setResult(data);
     } catch (err: any) {
       setError(err.message || "Ошибка обработки");

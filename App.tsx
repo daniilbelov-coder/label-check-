@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Scan, FileText, CheckCheck, FileSpreadsheet, ChevronRight, Sun, Moon } from 'lucide-react';
+import { Scan, FileText, CheckCheck, FileSpreadsheet, ChevronRight, Sun, Moon, LogOut } from 'lucide-react';
 import BriefProcessor from './components/BriefProcessor';
 import LabelComparator from './components/LabelComparator';
 import FinalCheck from './components/FinalCheck';
+import Login from './components/Login';
 import { AppView } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>('home');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Проверяем есть ли сохраненный API ключ
+    return !!localStorage.getItem('api_secret');
+  });
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' || 
+      return localStorage.getItem('theme') === 'dark' ||
              (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
     }
     return false;
@@ -26,6 +31,24 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
+
+  const handleLogin = (apiSecret: string) => {
+    // Сохраняем ключ в localStorage
+    localStorage.setItem('api_secret', apiSecret);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    // Удаляем ключ из localStorage
+    localStorage.removeItem('api_secret');
+    setIsAuthenticated(false);
+    setCurrentView('home');
+  };
+
+  // Если не авторизован - показываем форму входа
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   const renderContent = () => {
     switch (currentView) {
@@ -96,14 +119,22 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center py-16 px-6 sm:px-10 lg:px-12 transition-colors duration-300">
       
-      {/* Theme Toggle & Header Container */}
-      <div className="max-w-6xl w-full flex justify-end mb-4">
+      {/* Theme Toggle & Logout Container */}
+      <div className="max-w-6xl w-full flex justify-end gap-2 mb-4">
         <button
           onClick={toggleDarkMode}
           className="p-3 rounded-2xl glass-card text-slate-500 dark:text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 transition-all shadow-sm"
           aria-label="Toggle theme"
         >
           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+        <button
+          onClick={handleLogout}
+          className="p-3 rounded-2xl glass-card text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-all shadow-sm"
+          aria-label="Logout"
+          title="Выйти"
+        >
+          <LogOut size={20} />
         </button>
       </div>
 

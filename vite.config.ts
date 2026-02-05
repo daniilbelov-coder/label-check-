@@ -1,25 +1,18 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
-  // @ts-ignore
-  const env = loadEnv(mode, (process as any).cwd(), '');
-
-  return {
-    plugins: [react()],
-    server: {
-      host: true,
-    },
-    preview: {
-      host: true,
-      port: 4173,
-      allowedHosts: true, // Required for Railway to prevent "Blocked Request"
-    },
-    define: {
-      // Explicitly inject environment variables globally so they are available in the client bundle
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
-    },
-  };
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true,
+  },
+  preview: {
+    host: true,
+    port: 4173,
+    allowedHosts: true,
+  },
+  build: {
+    sourcemap: false, // БЕЗОПАСНОСТЬ: Отключаем source maps в production
+  },
+  // УДАЛЕНО: define блок - никогда не внедряем секреты в клиентский код
 });

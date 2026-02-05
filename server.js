@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createAIProvider } from './services/aiProviders.js';
 import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
+import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT } from './services/prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +13,10 @@ const PORT = process.env.PORT || 3000;
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 const YANDEX_API_KEY = process.env.YANDEX_CLOUD_API_KEY;
 const YANDEX_FOLDER_ID = process.env.YANDEX_CLOUD_FOLDER;
+
+// === БЕЗОПАСНОСТЬ: API Аутентификация ===
+const API_SECRET = process.env.API_SECRET || 'dev-secret-change-me';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 
 const mimeTypes = {
@@ -56,6 +61,114 @@ function sendJSON(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
+// === БЕЗОПАСНОСТЬ: Middleware для проверки API ключа ===
+function requireApiAuth(req, res) {
+  // В development режиме пропускаем проверку для удобства
+  if (NODE_ENV === 'development') return true;
+
+  // Получаем ключ из заголовка X-API-Key
+  const apiKey = req.headers['x-api-key'];
+
+  if (!apiKey || apiKey !== API_SECRET) {
+    sendJSON(res, 401, { error: 'Неавторизован: Неверный или отсутствующий API ключ' });
+    return false;
+  }
+
+  return true;
+}
+
+// === БЕЗОПАСНОСТЬ: Rate Limiting ===
+const rateLimitMap = new Map(); // IP адрес → {count, resetTime}
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 минут в миллисекундах
+const RATE_LIMIT_MAX = 20; // 20 запросов на IP за 15 минут
+
+function checkRateLimit(req, res) {
+  // Получаем IP адрес клиента
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0] ||
+                   req.socket.remoteAddress;
+
+  const now = Date.now();
+  const record = rateLimitMap.get(clientIp) || {
+    count: 0,
+    resetTime: now + RATE_LIMIT_WINDOW
+  };
+
+  // Сбрасываем счетчик если окно истекло
+  if (now > record.resetTime) {
+    record.count = 0;
+    record.resetTime = now + RATE_LIMIT_WINDOW;
+  }
+
+  record.count++;
+  rateLimitMap.set(clientIp, record);
+
+  // Проверяем лимит
+  if (record.count > RATE_LIMIT_MAX) {
+    const waitMinutes = Math.ceil((record.resetTime - now) / 60000);
+    sendJSON(res, 429, {
+      error: `Слишком много запросов. Подождите ${waitMinutes} минут.`
+    });
+    return false;
+  }
+
+  return true;
+}
+
+// Очистка старых записей каждый час (экономим память)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of rateLimitMap.entries()) {
+    if (now > record.resetTime + RATE_LIMIT_WINDOW) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, 60 * 60 * 1000);
+
+// === БЕЗОПАСНОСТЬ: Валидация Входных Данных ===
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB в байтах
+const MAX_TEXT_LENGTH = 50000; // 50,000 символов
+
+function validateInput(body, requiredFields) {
+  // Проверка обязательных полей
+  for (const field of requiredFields) {
+    if (!body[field]) {
+      return {
+        valid: false,
+        error: `Отсутствует обязательное поле: ${field}`
+      };
+    }
+  }
+
+  // Проверка длины текста
+  if (body.text && body.text.length > MAX_TEXT_LENGTH) {
+    return {
+      valid: false,
+      error: `Текст слишком длинный (максимум ${MAX_TEXT_LENGTH} символов)`
+    };
+  }
+
+  // Проверка imageUrl (должен быть data URI)
+  if (body.imageUrl) {
+    if (!body.imageUrl.startsWith('data:image/')) {
+      return {
+        valid: false,
+        error: 'Неверный формат изображения'
+      };
+    }
+
+    // Проверка размера base64 (примерно)
+    // Base64 увеличивает размер на ~33%, поэтому умножаем на 1.4
+    if (body.imageUrl.length > MAX_FILE_SIZE * 1.4) {
+      return {
+        valid: false,
+        error: 'Изображение слишком большое (максимум 10 MB)'
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
 const server = http.createServer(async (req, res) => {
 
   // ===== API: GET AVAILABLE MODELS =====
@@ -90,16 +203,31 @@ const server = http.createServer(async (req, res) => {
       });
     } catch (err) {
       console.error('Available Models API Error:', err.message);
-      sendJSON(res, 500, { error: err.message });
+      sendJSON(res, 500, { error: 'Не удалось загрузить модели. Попробуйте позже.' });
     }
     return;
   }
 
   // ===== API: BRIEF PROCESSING (text only) =====
   if (req.method === 'POST' && req.url === '/api/brief') {
+    if (!checkRateLimit(req, res)) return;
+    if (!requireApiAuth(req, res)) return;
+
     try {
-      const { text, systemPrompt, modelId } = await parseBody(req);
-      console.log('Processing brief with model:', modelId || DEFAULT_MODEL);
+      const { text, briefType, modelId } = await parseBody(req);
+
+      // Валидация
+      const validation = validateInput({ text }, ['text']);
+      if (!validation.valid) {
+        return sendJSON(res, 400, { error: validation.error });
+      }
+
+      // Сервер выбирает промпт, клиент не отправляет его
+      const systemPrompt = BRIEF_PROMPTS[briefType] || BRIEF_PROMPTS.food;
+
+      if (NODE_ENV === 'development') {
+        console.log('Processing brief with model:', modelId || DEFAULT_MODEL, 'type:', briefType);
+      }
 
       const result = await callAI({
         prompt: `Обработай следующий текст брифа согласно инструкциям и верни результат СТРОГО в формате JSON:\n\n${text}`,
@@ -121,24 +249,38 @@ const server = http.createServer(async (req, res) => {
       sendJSON(res, 200, { result: parsed });
     } catch (err) {
       console.error('Brief API Error:', err.message);
-      sendJSON(res, 500, { error: err.message });
+      sendJSON(res, 500, { error: 'Не удалось обработать бриф. Проверьте формат данных.' });
     }
     return;
   }
 
   // ===== API: LABEL COMPARISON (image + text) =====
   if (req.method === 'POST' && req.url === '/api/analyze') {
+    if (!checkRateLimit(req, res)) return;
+    if (!requireApiAuth(req, res)) return;
+
     try {
-      const { imageUrl, text, systemPrompt, modelId } = await parseBody(req);
-      
+      const { imageUrl, text, modelId } = await parseBody(req);
+
+      // Валидация
+      const validation = validateInput({ imageUrl, text }, ['imageUrl', 'text']);
+      if (!validation.valid) {
+        return sendJSON(res, 400, { error: validation.error });
+      }
+
+      // Сервер использует свой промпт
+      const systemPrompt = COMPARISON_SYSTEM_PROMPT;
+
       // Validate model supports images
       const selectedModelId = modelId || DEFAULT_MODEL;
       const modelConfig = ALL_MODELS.find(m => m.id === selectedModelId);
       if (modelConfig && !modelConfig.capabilities?.images) {
         throw new Error(`Model ${selectedModelId} does not support image analysis`);
       }
-      
-      console.log('Analyzing label with model:', selectedModelId);
+
+      if (NODE_ENV === 'development') {
+        console.log('Analyzing label with model:', selectedModelId);
+      }
 
       const result = await callAI({
         prompt: `ЭТАЛОН (EXCEL):\n${text}\n\nСравни это с изображением. Будь педантичен к регистру букв.`,
@@ -150,24 +292,38 @@ const server = http.createServer(async (req, res) => {
       sendJSON(res, 200, { result });
     } catch (err) {
       console.error('Analyze API Error:', err.message);
-      sendJSON(res, 500, { error: err.message });
+      sendJSON(res, 500, { error: 'Не удалось проанализировать этикетку.' });
     }
     return;
   }
 
   // ===== API: FINAL PROOFREAD (image only) =====
   if (req.method === 'POST' && req.url === '/api/proofread') {
+    if (!checkRateLimit(req, res)) return;
+    if (!requireApiAuth(req, res)) return;
+
     try {
-      const { imageUrl, systemPrompt, modelId } = await parseBody(req);
-      
+      const { imageUrl, modelId } = await parseBody(req);
+
+      // Валидация
+      const validation = validateInput({ imageUrl }, ['imageUrl']);
+      if (!validation.valid) {
+        return sendJSON(res, 400, { error: validation.error });
+      }
+
+      // Сервер использует свой промпт
+      const systemPrompt = FINAL_CHECK_SYSTEM_PROMPT;
+
       // Validate model supports images
       const selectedModelId = modelId || DEFAULT_MODEL;
       const modelConfig = ALL_MODELS.find(m => m.id === selectedModelId);
       if (modelConfig && !modelConfig.capabilities?.images) {
         throw new Error(`Model ${selectedModelId} does not support image analysis`);
       }
-      
-      console.log('Proofreading label with model:', selectedModelId);
+
+      if (NODE_ENV === 'development') {
+        console.log('Proofreading label with model:', selectedModelId);
+      }
 
       const result = await callAI({
         prompt: 'Найди все орфографические и пунктуационные ошибки на изображении.',
@@ -179,7 +335,7 @@ const server = http.createServer(async (req, res) => {
       sendJSON(res, 200, { result });
     } catch (err) {
       console.error('Proofread API Error:', err.message);
-      sendJSON(res, 500, { error: err.message });
+      sendJSON(res, 500, { error: 'Не удалось проверить этикетку.' });
     }
     return;
   }

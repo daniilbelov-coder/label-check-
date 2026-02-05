@@ -4,7 +4,7 @@ import Dropzone from './Dropzone';
 import AnalysisResult from './AnalysisResult';
 import { FileData, AnalysisResultData, AppView } from '../types';
 import { fileToBase64, createPreviewUrl } from '../utils/fileHelpers';
-import { proofreadLabel } from '../services/geminiService';
+import { proofreadLabel, getAvailableModels } from '../services/geminiService';
 import { ALL_MODELS, DEFAULT_MODEL } from '../config/modelConfig';
 
 interface ModelConfig {
@@ -31,21 +31,18 @@ const FinalCheck: React.FC<Props> = ({ onBack, onNavigate }) => {
 
   // Load available models that support images
   useEffect(() => {
-    const fetchAvailableModels = async () => {
+    const fetchModels = async () => {
       try {
-        const response = await fetch('/api/available-models?filter=images');
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableModels(data.models || []);
-          if (data.defaultModel) {
-            setSelectedModel(data.defaultModel);
-          }
+        const data = await getAvailableModels('images');
+        setAvailableModels(data.models || []);
+        if (data.defaultModel) {
+          setSelectedModel(data.defaultModel);
         }
       } catch (err) {
         console.error('Failed to load available models:', err);
       }
     };
-    fetchAvailableModels();
+    fetchModels();
   }, []);
 
   const handleFileSelect = (selectedFile: File) => {
