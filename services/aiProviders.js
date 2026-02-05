@@ -43,11 +43,6 @@ class ReplicateProvider extends AIProvider {
       temperature: 0.1,
     };
 
-    // Special handling for gpt-5-structured
-    if (model === 'openai/gpt-5-structured') {
-      input.model = 'gpt-5-nano';  // Specify which GPT-5 model to use
-    }
-
     // Handle system prompt
     if (systemPrompt) {
       if (capabilities.systemPrompt && inputMapping.systemPrompt) {
@@ -69,9 +64,8 @@ class ReplicateProvider extends AIProvider {
     }
 
     // Set max tokens with model-specific key
-    // Use high token limit for complete JSON responses
     if (inputMapping.maxTokens) {
-      input[inputMapping.maxTokens] = 16384; // Increased from 8192 to allow longer responses
+      input[inputMapping.maxTokens] = 8192;
     }
 
     // Use model identifier endpoint (owner/model-name)
