@@ -237,6 +237,8 @@ const server = http.createServer(async (req, res) => {
         modelId: requestModelId
       });
 
+      console.log('🔍 RAW AI RESPONSE:', result.substring(0, 500) + '...');
+
       // Try to parse JSON from response
       let parsed;
       try {
@@ -244,7 +246,10 @@ const server = http.createServer(async (req, res) => {
         const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) || result.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : result;
         parsed = JSON.parse(jsonStr);
-      } catch {
+        console.log('✅ PARSED JSON KEYS:', Object.keys(parsed));
+        console.log('✅ PARSED JSON:', JSON.stringify(parsed, null, 2).substring(0, 500) + '...');
+      } catch (e) {
+        console.error('❌ JSON PARSE ERROR:', e.message);
         parsed = { "Результат": result };
       }
 
