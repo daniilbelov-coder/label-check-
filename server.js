@@ -213,8 +213,10 @@ const server = http.createServer(async (req, res) => {
     if (!checkRateLimit(req, res)) return;
     if (!requireApiAuth(req, res)) return;
 
+    let requestModelId = DEFAULT_MODEL;
     try {
       const { text, briefType, modelId } = await parseBody(req);
+      requestModelId = modelId || DEFAULT_MODEL;
 
       // Валидация
       const validation = validateInput({ text }, ['text']);
@@ -226,15 +228,15 @@ const server = http.createServer(async (req, res) => {
       const systemPrompt = BRIEF_PROMPTS[briefType] || BRIEF_PROMPTS.food;
 
       if (NODE_ENV === 'development') {
-        console.log('Processing brief with model:', modelId || DEFAULT_MODEL, 'type:', briefType);
+        console.log('Processing brief with model:', requestModelId, 'type:', briefType);
       }
 
       const result = await callAI({
         prompt: `Обработай следующий текст брифа согласно инструкциям и верни результат СТРОГО в формате JSON:\n\n${text}`,
         systemPrompt,
-        modelId: modelId || DEFAULT_MODEL
+        modelId: requestModelId
       });
-      
+
       // Try to parse JSON from response
       let parsed;
       try {
@@ -245,11 +247,20 @@ const server = http.createServer(async (req, res) => {
       } catch {
         parsed = { "Результат": result };
       }
-      
+
       sendJSON(res, 200, { result: parsed });
     } catch (err) {
-      console.error('Brief API Error:', err.message);
-      sendJSON(res, 500, { error: 'Не удалось обработать бриф. Проверьте формат данных.' });
+      console.error('Error processing brief:', {
+        message: err.message,
+        stack: err.stack,
+        model: requestModelId,
+        timestamp: new Date().toISOString()
+      });
+      sendJSON(res, 500, {
+        error: 'Не удалось обработать бриф. Проверьте формат данных.',
+        details: err.message,
+        model: requestModelId
+      });
     }
     return;
   }
@@ -259,8 +270,10 @@ const server = http.createServer(async (req, res) => {
     if (!checkRateLimit(req, res)) return;
     if (!requireApiAuth(req, res)) return;
 
+    let requestModelId = DEFAULT_MODEL;
     try {
       const { imageUrl, text, modelId } = await parseBody(req);
+      requestModelId = modelId || DEFAULT_MODEL;
 
       // Валидация
       const validation = validateInput({ imageUrl, text }, ['imageUrl', 'text']);
@@ -272,27 +285,35 @@ const server = http.createServer(async (req, res) => {
       const systemPrompt = COMPARISON_SYSTEM_PROMPT;
 
       // Validate model supports images
-      const selectedModelId = modelId || DEFAULT_MODEL;
-      const modelConfig = ALL_MODELS.find(m => m.id === selectedModelId);
+      const modelConfig = ALL_MODELS.find(m => m.id === requestModelId);
       if (modelConfig && !modelConfig.capabilities?.images) {
-        throw new Error(`Model ${selectedModelId} does not support image analysis`);
+        throw new Error(`Model ${requestModelId} does not support image analysis`);
       }
 
       if (NODE_ENV === 'development') {
-        console.log('Analyzing label with model:', selectedModelId);
+        console.log('Analyzing label with model:', requestModelId);
       }
 
       const result = await callAI({
         prompt: `ЭТАЛОН (EXCEL):\n${text}\n\nСравни это с изображением. Будь педантичен к регистру букв.`,
         systemPrompt,
         images: [imageUrl],
-        modelId: selectedModelId
+        modelId: requestModelId
       });
-      
+
       sendJSON(res, 200, { result });
     } catch (err) {
-      console.error('Analyze API Error:', err.message);
-      sendJSON(res, 500, { error: 'Не удалось проанализировать этикетку.' });
+      console.error('Error analyzing label:', {
+        message: err.message,
+        stack: err.stack,
+        model: requestModelId,
+        timestamp: new Date().toISOString()
+      });
+      sendJSON(res, 500, {
+        error: 'Не удалось проанализировать этикетку.',
+        details: err.message,
+        model: requestModelId
+      });
     }
     return;
   }
@@ -302,8 +323,10 @@ const server = http.createServer(async (req, res) => {
     if (!checkRateLimit(req, res)) return;
     if (!requireApiAuth(req, res)) return;
 
+    let requestModelId = DEFAULT_MODEL;
     try {
       const { imageUrl, modelId } = await parseBody(req);
+      requestModelId = modelId || DEFAULT_MODEL;
 
       // Валидация
       const validation = validateInput({ imageUrl }, ['imageUrl']);
@@ -315,27 +338,35 @@ const server = http.createServer(async (req, res) => {
       const systemPrompt = FINAL_CHECK_SYSTEM_PROMPT;
 
       // Validate model supports images
-      const selectedModelId = modelId || DEFAULT_MODEL;
-      const modelConfig = ALL_MODELS.find(m => m.id === selectedModelId);
+      const modelConfig = ALL_MODELS.find(m => m.id === requestModelId);
       if (modelConfig && !modelConfig.capabilities?.images) {
-        throw new Error(`Model ${selectedModelId} does not support image analysis`);
+        throw new Error(`Model ${requestModelId} does not support image analysis`);
       }
 
       if (NODE_ENV === 'development') {
-        console.log('Proofreading label with model:', selectedModelId);
+        console.log('Proofreading label with model:', requestModelId);
       }
 
       const result = await callAI({
         prompt: 'Найди все орфографические и пунктуационные ошибки на изображении.',
         systemPrompt,
         images: [imageUrl],
-        modelId: selectedModelId
+        modelId: requestModelId
       });
-      
+
       sendJSON(res, 200, { result });
     } catch (err) {
-      console.error('Proofread API Error:', err.message);
-      sendJSON(res, 500, { error: 'Не удалось проверить этикетку.' });
+      console.error('Error proofreading label:', {
+        message: err.message,
+        stack: err.stack,
+        model: requestModelId,
+        timestamp: new Date().toISOString()
+      });
+      sendJSON(res, 500, {
+        error: 'Не удалось проверить этикетку.',
+        details: err.message,
+        model: requestModelId
+      });
     }
     return;
   }

@@ -2,7 +2,39 @@
 // This file defines available AI models and providers
 
 export const ALL_MODELS = [
+  // Yandex models (positioned first)
+  {
+    id: 'yandexgpt',
+    model: 'yandexgpt',
+    displayName: 'YandexGPT',
+    provider: 'yandex',
+    description: 'Базовая модель Yandex',
+    capabilities: { images: false, systemPrompt: true },
+    inputMapping: {}
+  },
+  {
+    id: 'yandexgpt-lite',
+    model: 'yandexgpt-lite',
+    displayName: 'YandexGPT Lite',
+    provider: 'yandex',
+    description: 'Облегченная модель Yandex',
+    capabilities: { images: false, systemPrompt: true },
+    inputMapping: {}
+  },
   // Google Gemini models (via Replicate)
+  {
+    id: 'gemini-3-flash',
+    model: 'google/gemini-3-flash',
+    displayName: 'Google Gemini 3 Flash',
+    provider: 'replicate',
+    description: 'Быстрая Gemini 3',
+    capabilities: { images: true, systemPrompt: true },
+    inputMapping: {
+      systemPrompt: 'system_instruction',
+      images: 'images',
+      maxTokens: 'max_output_tokens'
+    }
+  },
   {
     id: 'gemini-2.5-flash',
     model: 'google/gemini-2.5-flash',
@@ -54,29 +86,10 @@ export const ALL_MODELS = [
     inputMapping: {
       maxTokens: 'max_tokens'
     }
-  },
-  // Yandex models
-  {
-    id: 'yandexgpt',
-    model: 'yandexgpt',
-    displayName: 'YandexGPT (Alice AI)',
-    provider: 'yandex',
-    description: 'Базовая модель Yandex',
-    capabilities: { images: false, systemPrompt: true },
-    inputMapping: {}
-  },
-  {
-    id: 'yandexgpt-lite',
-    model: 'yandexgpt-lite',
-    displayName: 'YandexGPT Lite',
-    provider: 'yandex',
-    description: 'Облегченная модель Yandex',
-    capabilities: { images: false, systemPrompt: true },
-    inputMapping: {}
   }
 ];
 
-export const DEFAULT_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_MODEL = 'yandexgpt';
 
 // For backend: all models available
 export const AVAILABLE_MODELS = ALL_MODELS;

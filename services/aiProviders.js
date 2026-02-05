@@ -83,7 +83,19 @@ class ReplicateProvider extends AIProvider {
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      throw new Error(`Replicate API Error (${model}): ${errorText}`);
+      let errorMessage = errorText;
+
+      // Try to parse JSON error response from Replicate
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.detail || errorJson.error || errorText;
+      } catch (e) {
+        // If not JSON, use raw text
+      }
+
+      throw new Error(
+        `Replicate API Error (${model}): HTTP ${createResponse.status} - ${errorMessage}`
+      );
     }
 
     const prediction = await createResponse.json();
