@@ -7,7 +7,7 @@ interface Props {
 
 // Хеш пароля (SHA-256): "label2025"
 // Пароль НЕ хранится в коде, только его хеш
-const PASSWORD_HASH = '8f3c7a5e9d2b1a4c6e8f0d3b5a7c9e1f2d4b6a8c0e2f4d6b8a0c2e4f6d8b0a2c';
+const PASSWORD_HASH = '95add883fe95ef2fc40a9979f0a3347fe20c0264ff962e80dd2b85f25c1e89fe';
 
 // Простая функция хеширования
 async function hashPassword(password: string): Promise<string> {
