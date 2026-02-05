@@ -36,6 +36,14 @@ const Settings: React.FC<Props> = ({ onClose }) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [originalPrompts, setOriginalPrompts] = useState<Prompts | null>(null);
 
+  // 🔒 ETag для защиты от race conditions
+  const [etag, setEtag] = useState<string | null>(null);
+  const [conflictData, setConflictData] = useState<{
+    serverPrompts: Prompts;
+    serverETag: string;
+    lastModified: string;
+  } | null>(null);
+
   // Загрузка промптов при монтировании
   useEffect(() => {
     loadPrompts();
@@ -46,7 +54,7 @@ const Settings: React.FC<Props> = ({ onClose }) => {
     setError(null);
 
     try {
-      const apiSecret = localStorage.getItem('apiSecret');
+      const apiSecret = localStorage.getItem('api_secret');
       if (!apiSecret) {
         throw new Error('API ключ не найден');
       }
@@ -63,8 +71,11 @@ const Settings: React.FC<Props> = ({ onClose }) => {
       }
 
       const data = await response.json();
+
+      // 🔒 Сохраняем ETag для последующей проверки
       setPrompts(data.prompts);
       setOriginalPrompts(data.prompts);
+      setEtag(data.etag);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка загрузки');
     } finally {
@@ -76,9 +87,10 @@ const Settings: React.FC<Props> = ({ onClose }) => {
     setIsSaving(true);
     setError(null);
     setSuccess(false);
+    setConflictData(null);
 
     try {
-      const apiSecret = localStorage.getItem('apiSecret');
+      const apiSecret = localStorage.getItem('api_secret');
       if (!apiSecret) {
         throw new Error('API ключ не найден');
       }
@@ -89,17 +101,34 @@ const Settings: React.FC<Props> = ({ onClose }) => {
           'X-API-Key': apiSecret,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ prompts })
+        body: JSON.stringify({
+          prompts,
+          etag  // 🔒 Отправляем ETag для проверки
+        })
       });
 
+      const data = await response.json();
+
+      // 🔒 Обработка конфликта (409)
+      if (response.status === 409) {
+        setConflictData({
+          serverPrompts: data.currentPrompts,
+          serverETag: data.currentETag,
+          lastModified: data.lastModified
+        });
+        setError(data.message || 'Промпты были изменены другим пользователем');
+        return;
+      }
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Не удалось сохранить промпты');
       }
 
+      // Успешно сохранено
       setSuccess(true);
       setHasChanges(false);
       setOriginalPrompts(prompts);
+      setEtag(data.etag);  // 🔒 Обновляем ETag
 
       // Скрыть сообщение об успехе через 3 секунды
       setTimeout(() => setSuccess(false), 3000);
@@ -113,6 +142,14 @@ const Settings: React.FC<Props> = ({ onClose }) => {
   const handlePromptChange = (type: PromptType, value: string) => {
     setPrompts(prev => ({ ...prev, [type]: value }));
     setHasChanges(true);
+  };
+
+  // 🔒 Обработчик конфликта - перезагрузить промпты с сервера
+  const handleConflictReload = () => {
+    loadPrompts();
+    setConflictData(null);
+    setError(null);
+    setHasChanges(false);
   };
 
   const handleClose = () => {
@@ -241,6 +278,40 @@ const Settings: React.FC<Props> = ({ onClose }) => {
           </div>
         </div>
       </div>
+
+      {/* 🔒 Conflict Modal - показывается при обнаружении конфликта */}
+      {conflictData && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertCircle size={24} className="text-orange-500" />
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white">Конфликт изменений</h3>
+            </div>
+
+            <p className="text-slate-600 dark:text-slate-300 mb-2">
+              Промпты были изменены другим пользователем во время вашего редактирования.
+            </p>
+            <p className="text-slate-600 dark:text-slate-300 mb-6">
+              Ваши изменения не сохранены. Пожалуйста, обновите страницу и повторите редактирование.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleConflictReload}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Обновить и начать заново
+              </button>
+              <button
+                onClick={() => setConflictData(null)}
+                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

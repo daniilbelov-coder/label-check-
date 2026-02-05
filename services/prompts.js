@@ -4,6 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -168,6 +169,21 @@ export function reloadPrompts() {
     console.error('Error reloading prompts:', err.message);
     return false;
   }
+}
+
+// 🔒 Функция для вычисления ETag промптов
+export function getPromptsETag() {
+  const content = JSON.stringify(BRIEF_PROMPTS);
+  return crypto.createHash('md5').update(content).digest('hex');
+}
+
+// 🔒 Функция для получения метаданных промптов с ETag
+export function getPromptsMetadata() {
+  return {
+    prompts: BRIEF_PROMPTS,
+    etag: getPromptsETag(),
+    lastModified: new Date().toISOString()
+  };
 }
 
 // --- ДРУГИЕ ПРОМПТЫ (для сравнения и финальной проверки) ---

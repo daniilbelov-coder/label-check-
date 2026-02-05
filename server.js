@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createAIProvider } from './services/aiProviders.js';
 import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
-import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts } from './services/prompts.js';
+import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts, getPromptsETag, getPromptsMetadata } from './services/prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -345,8 +345,17 @@ const server = http.createServer(async (req, res) => {
     if (!requireApiAuth(req, res)) return;
 
     try {
-      const prompts = BRIEF_PROMPTS;
-      sendJSON(res, 200, { prompts });
+      const metadata = getPromptsMetadata();
+
+      // 🔒 Отправляем ETag в заголовке (стандарт HTTP)
+      res.setHeader('ETag', metadata.etag);
+
+      // И в теле ответа (для удобства клиента)
+      sendJSON(res, 200, {
+        prompts: metadata.prompts,
+        etag: metadata.etag,
+        lastModified: metadata.lastModified
+      });
     } catch (err) {
       console.error('Get Prompts API Error:', err.message);
       sendJSON(res, 500, { error: 'Не удалось загрузить промпты' });
@@ -360,11 +369,27 @@ const server = http.createServer(async (req, res) => {
     if (!requireApiAuth(req, res)) return;
 
     try {
-      const { prompts } = await parseBody(req);
+      const { prompts, etag: clientETag } = await parseBody(req);
 
       // Валидация
       if (!prompts || typeof prompts !== 'object') {
         return sendJSON(res, 400, { error: 'Неверный формат промптов' });
+      }
+
+      // 🔒 OPTIMISTIC LOCKING: Проверка ETag для защиты от race conditions
+      const currentETag = getPromptsETag();
+
+      if (clientETag && clientETag !== currentETag) {
+        // Конфликт! Промпты были изменены другим пользователем
+        const currentMetadata = getPromptsMetadata();
+
+        return sendJSON(res, 409, {
+          error: 'Конфликт: Промпты были изменены другим пользователем',
+          message: 'Пожалуйста, обновите страницу и повторите редактирование',
+          currentETag: currentMetadata.etag,
+          currentPrompts: currentMetadata.prompts,
+          lastModified: currentMetadata.lastModified
+        });
       }
 
       // Проверка наличия всех ключей
@@ -386,11 +411,19 @@ const server = http.createServer(async (req, res) => {
       // Перезагрузить промпты в память
       reloadPrompts();
 
+      // Получить новый ETag после сохранения
+      const newMetadata = getPromptsMetadata();
+
       if (NODE_ENV === 'development') {
-        console.log('Prompts updated successfully');
+        console.log('Prompts updated successfully. New ETag:', newMetadata.etag);
       }
 
-      sendJSON(res, 200, { success: true, message: 'Промпты успешно обновлены' });
+      sendJSON(res, 200, {
+        success: true,
+        message: 'Промпты успешно обновлены',
+        etag: newMetadata.etag,
+        lastModified: newMetadata.lastModified
+      });
     } catch (err) {
       console.error('Update Prompts API Error:', err.message);
       sendJSON(res, 500, { error: 'Не удалось сохранить промпты' });
