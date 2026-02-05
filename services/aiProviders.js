@@ -99,7 +99,9 @@ class ReplicateProvider extends AIProvider {
     }
 
     const prediction = await createResponse.json();
-    
+
+    console.log('📊 Replicate prediction status:', prediction.status);
+
     // If prediction is still processing, poll for result
     let output;
     if (prediction.status === 'succeeded') {
@@ -112,7 +114,14 @@ class ReplicateProvider extends AIProvider {
       output = await this.waitForPrediction(prediction.id);
     }
 
-    return typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
+    console.log('📊 Output type:', typeof output, 'is array:', Array.isArray(output));
+    console.log('📊 Raw output:', Array.isArray(output) ? `Array[${output.length}]` : output?.substring?.(0, 200));
+
+    const finalResult = typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
+    console.log('📊 Final result length:', finalResult.length, 'chars');
+    console.log('📊 Final result preview:', finalResult.substring(0, 300) + '...');
+
+    return finalResult;
   }
 }
 
