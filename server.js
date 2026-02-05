@@ -237,34 +237,43 @@ const server = http.createServer(async (req, res) => {
         modelId: requestModelId
       });
 
-      console.log('🔍 RAW AI RESPONSE:', result.substring(0, 500) + '...');
+      console.log('🔍 RAW AI RESPONSE LENGTH:', result.length, 'chars');
+      console.log('🔍 RAW AI RESPONSE PREVIEW:', result.substring(0, 300));
+      console.log('🔍 RAW AI RESPONSE END:', result.substring(result.length - 100));
 
       // Try to parse JSON from response
       let parsed;
-
-      // Step 1: Try to extract JSON from markdown code blocks
       let jsonStr = result;
-      const markdownMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
-      if (markdownMatch) {
-        jsonStr = markdownMatch[1];
-        console.log('📝 Found markdown JSON block');
-      } else {
-        // Try to find raw JSON
-        const jsonMatch = result.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonStr = jsonMatch[0];
-          console.log('📝 Found raw JSON');
-        }
+
+      // Step 1: Remove markdown code blocks if present
+      // Match both complete blocks and incomplete blocks
+      if (result.includes('```json')) {
+        // Remove opening marker
+        jsonStr = result.replace(/```json\s*/g, '');
+        // Remove closing marker if present
+        jsonStr = jsonStr.replace(/```\s*$/g, '');
+        console.log('📝 Removed markdown markers');
       }
 
-      // Step 2: Parse the JSON
+      // Step 2: Extract just the JSON object
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+        console.log('📝 Extracted JSON from text, length:', jsonStr.length);
+      }
+
+      // Step 3: Parse the JSON
       try {
         parsed = JSON.parse(jsonStr);
         console.log('✅ PARSED JSON KEYS:', Object.keys(parsed));
-        console.log('✅ PARSED JSON:', JSON.stringify(parsed, null, 2).substring(0, 500) + '...');
+        console.log('✅ PARSED JSON VALUES PREVIEW:');
+        Object.keys(parsed).slice(0, 3).forEach(key => {
+          console.log(`   "${key}": ${parsed[key].substring(0, 80)}...`);
+        });
       } catch (e) {
         console.error('❌ JSON PARSE ERROR:', e.message);
-        console.error('❌ ATTEMPTED TO PARSE:', jsonStr.substring(0, 200));
+        console.error('❌ ATTEMPTED TO PARSE (first 300 chars):', jsonStr.substring(0, 300));
+        console.error('❌ ATTEMPTED TO PARSE (last 100 chars):', jsonStr.substring(jsonStr.length - 100));
         parsed = { "Результат": result };
       }
 

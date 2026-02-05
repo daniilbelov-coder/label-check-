@@ -115,11 +115,21 @@ class ReplicateProvider extends AIProvider {
     }
 
     console.log('📊 Output type:', typeof output, 'is array:', Array.isArray(output));
-    console.log('📊 Raw output:', Array.isArray(output) ? `Array[${output.length}]` : output?.substring?.(0, 200));
+
+    if (Array.isArray(output)) {
+      console.log('📊 Array length:', output.length, 'elements');
+      console.log('📊 Array elements:');
+      output.forEach((item, i) => {
+        console.log(`   [${i}]: "${item.substring(0, 60)}${item.length > 60 ? '...' : ''}"`);
+      });
+    } else {
+      console.log('📊 Raw output:', output?.substring?.(0, 200));
+    }
 
     const finalResult = typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
     console.log('📊 Final result length:', finalResult.length, 'chars');
-    console.log('📊 Final result preview:', finalResult.substring(0, 300) + '...');
+    console.log('📊 Final result starts with:', finalResult.substring(0, 100));
+    console.log('📊 Final result ends with:', finalResult.substring(finalResult.length - 100));
 
     return finalResult;
   }
