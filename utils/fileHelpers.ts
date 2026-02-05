@@ -144,7 +144,11 @@ export const addCorrectionColumnToExcel = async (
           // Add "Исправленный текст" header in column G (index 6)
           headerRow[6] = "Исправленный текст";
         }
-        
+
+        // DEBUG: Log corrections keys
+        console.log('📋 Corrections keys:', Object.keys(corrections));
+        console.log('📋 Corrections object:', corrections);
+
         // Iterate through rows and match block names from column A
         jsonData.forEach((row: any, index) => {
           if (index === 0 || !Array.isArray(row)) return; // Skip header row
@@ -155,7 +159,10 @@ export const addCorrectionColumnToExcel = async (
             const trimmedBlockName = blockName.trim();
             // Extract first line only (before \r\n or \n) to match correction keys
             const firstLine = trimmedBlockName.split(/[\r\n]+/)[0].trim();
-            
+
+            // DEBUG: Log each row attempt
+            console.log(`🔍 Row ${index}: Column A = "${firstLine}"`);
+
             // Find matching correction by block name (case-insensitive)
             let correction = corrections[firstLine];
             
@@ -182,7 +189,10 @@ export const addCorrectionColumnToExcel = async (
             
             if (correction) {
               // Add correction to column G (index 6)
+              console.log(`✅ Row ${index}: MATCHED! Adding correction (length: ${correction.length} chars)`);
               row[6] = correction;
+            } else {
+              console.log(`❌ Row ${index}: NO MATCH for "${firstLine}"`);
             }
           }
         });
