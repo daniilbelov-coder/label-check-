@@ -106,16 +106,6 @@ const Login: React.FC<Props> = ({ onLogin }) => {
             </p>
           </div>
         </div>
-
-        {/* Hint for admin */}
-        <div className="mt-4 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-600">
-            Текущий пароль: <code className="bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">label2025</code>
-          </p>
-          <p className="text-xs text-slate-400 dark:text-slate-700 mt-1">
-            (Это сообщение можно удалить в компоненте Login.tsx)
-          </p>
-        </div>
       </div>
     </div>
   );
