@@ -36,12 +36,17 @@ class ReplicateProvider extends AIProvider {
 
   async generateText({ prompt, systemPrompt, images = [] }) {
     const { model, inputMapping, capabilities } = this.modelConfig;
-    
+
     // Build input with dynamic mapping
     const input = {
       prompt,
       temperature: 0.1,
     };
+
+    // Special handling for gpt-5-structured
+    if (model === 'openai/gpt-5-structured') {
+      input.model = 'gpt-5-nano';  // Specify which GPT-5 model to use
+    }
 
     // Handle system prompt
     if (systemPrompt) {

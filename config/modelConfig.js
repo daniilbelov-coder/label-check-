@@ -21,18 +21,19 @@ export const ALL_MODELS = [
     capabilities: { images: false, systemPrompt: true },
     inputMapping: {}
   },
-  // OpenAI GPT-5 Nano (via Replicate)
+  // OpenAI GPT-5 Nano Structured (via Replicate) - guaranteed clean JSON
   {
     id: 'gpt-5-nano',
-    model: 'openai/gpt-5-nano',
+    model: 'openai/gpt-5-structured',
     displayName: 'OpenAI GPT-5 Nano',
     provider: 'replicate',
-    description: 'Быстрая и экономичная GPT-5',
+    description: 'Быстрая GPT-5 с гарантированным JSON',
     capabilities: { images: true, systemPrompt: true },
     inputMapping: {
+      model: 'model',  // For gpt-5-structured, we need to specify which model
       systemPrompt: 'system_prompt',
       images: 'image_input',
-      maxTokens: 'max_completion_tokens'
+      maxTokens: 'max_tokens'
     }
   }
 ];
