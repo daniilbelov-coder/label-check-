@@ -17,20 +17,28 @@ class ReplicateProvider extends AIProvider {
 
   async waitForPrediction(predictionId) {
     const maxAttempts = 180; // 6 minutes max
+    console.log(`⏳ Waiting for prediction ${predictionId}...`);
+
     for (let i = 0; i < maxAttempts; i++) {
       const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
         headers: { 'Authorization': `Bearer ${this.apiKey}` },
       });
       const prediction = await response.json();
 
+      console.log(`⏳ Attempt ${i + 1}/${maxAttempts}: status = ${prediction.status}`);
+
       if (prediction.status === 'succeeded') {
+        console.log('✅ Prediction succeeded!');
         return prediction.output;
       } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
+        console.error('❌ Prediction failed:', prediction.error);
         throw new Error(prediction.error || 'Prediction failed');
       }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
+
+    console.error('❌ Prediction timeout after', maxAttempts * 2, 'seconds');
     throw new Error('Prediction timeout');
   }
 
@@ -64,14 +72,23 @@ class ReplicateProvider extends AIProvider {
     }
 
     // Set max tokens with model-specific key
-    // Use maximum available tokens for better results
+    // Use high token limit for complete JSON responses
     if (inputMapping.maxTokens) {
-      input[inputMapping.maxTokens] = 65535; // Gemini supports up to 65535 output tokens
+      input[inputMapping.maxTokens] = 16384; // Increased from 8192 to allow longer responses
     }
 
     // Use model identifier endpoint (owner/model-name)
     const apiUrl = `https://api.replicate.com/v1/models/${model}/predictions`;
-    
+
+    console.log('🚀 Creating Replicate prediction for model:', model);
+    console.log('🚀 Input config:', {
+      promptLength: input.prompt?.length,
+      temperature: input.temperature,
+      maxTokens: input[inputMapping.maxTokens] || 'not set',
+      hasSystemPrompt: !!input[inputMapping.systemPrompt],
+      imageCount: input[inputMapping.images]?.length || 0
+    });
+
     const createResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: {
