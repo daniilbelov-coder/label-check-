@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createAIProvider } from './services/aiProviders.js';
 import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
-import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT } from './services/prompts.js';
+import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts } from './services/prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -336,6 +336,64 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       console.error('Proofread API Error:', err.message);
       sendJSON(res, 500, { error: 'Не удалось проверить этикетку.' });
+    }
+    return;
+  }
+
+  // ===== API: GET PROMPTS =====
+  if (req.method === 'GET' && req.url === '/api/prompts') {
+    if (!requireApiAuth(req, res)) return;
+
+    try {
+      const prompts = BRIEF_PROMPTS;
+      sendJSON(res, 200, { prompts });
+    } catch (err) {
+      console.error('Get Prompts API Error:', err.message);
+      sendJSON(res, 500, { error: 'Не удалось загрузить промпты' });
+    }
+    return;
+  }
+
+  // ===== API: UPDATE PROMPTS =====
+  if (req.method === 'POST' && req.url === '/api/prompts') {
+    if (!checkRateLimit(req, res)) return;
+    if (!requireApiAuth(req, res)) return;
+
+    try {
+      const { prompts } = await parseBody(req);
+
+      // Валидация
+      if (!prompts || typeof prompts !== 'object') {
+        return sendJSON(res, 400, { error: 'Неверный формат промптов' });
+      }
+
+      // Проверка наличия всех ключей
+      const requiredKeys = ['food', 'nonfood', 'inter', 'ge'];
+      for (const key of requiredKeys) {
+        if (!prompts[key] || typeof prompts[key] !== 'string') {
+          return sendJSON(res, 400, { error: `Отсутствует промпт: ${key}` });
+        }
+
+        // Проверка размера (100KB макс на промпт)
+        if (prompts[key].length > 100000) {
+          return sendJSON(res, 400, { error: `Промпт ${key} слишком большой (максимум 100KB)` });
+        }
+      }
+
+      // Сохранить промпты в файл
+      savePrompts(prompts);
+
+      // Перезагрузить промпты в память
+      reloadPrompts();
+
+      if (NODE_ENV === 'development') {
+        console.log('Prompts updated successfully');
+      }
+
+      sendJSON(res, 200, { success: true, message: 'Промпты успешно обновлены' });
+    } catch (err) {
+      console.error('Update Prompts API Error:', err.message);
+      sendJSON(res, 500, { error: 'Не удалось сохранить промпты' });
     }
     return;
   }

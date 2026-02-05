@@ -17,6 +17,9 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Prompts data (коммерческая тайна)
+prompts-data.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

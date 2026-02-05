@@ -117,3 +117,35 @@ export const getAvailableModels = async (filter?: 'images' | 'text') => {
   const data = await response.json();
   return data;
 };
+
+// --- SERVICE 5: GET PROMPTS ---
+export const getPrompts = async (): Promise<Record<string, string>> => {
+  const response = await fetchWithAuth('/api/prompts', {
+    method: 'GET'
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.prompts;
+};
+
+// --- SERVICE 6: SAVE PROMPTS ---
+export const savePrompts = async (prompts: Record<string, string>): Promise<{ success: boolean; message: string }> => {
+  const response = await fetchWithAuth('/api/prompts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompts })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data;
+};

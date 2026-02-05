@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Scan, FileText, CheckCheck, FileSpreadsheet, ChevronRight, Sun, Moon, LogOut } from 'lucide-react';
+import { Scan, FileText, CheckCheck, FileSpreadsheet, ChevronRight, Sun, Moon, LogOut, Settings } from 'lucide-react';
 import BriefProcessor from './components/BriefProcessor';
 import LabelComparator from './components/LabelComparator';
 import FinalCheck from './components/FinalCheck';
 import Login from './components/Login';
+import SettingsModal from './components/Settings';
 import { AppView } from './types';
 
 const App: React.FC = () => {
@@ -19,6 +20,7 @@ const App: React.FC = () => {
     }
     return false;
   });
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -119,7 +121,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center py-16 px-6 sm:px-10 lg:px-12 transition-colors duration-300">
       
-      {/* Theme Toggle & Logout Container */}
+      {/* Theme Toggle, Settings & Logout Container */}
       <div className="max-w-6xl w-full flex justify-end gap-2 mb-4">
         <button
           onClick={toggleDarkMode}
@@ -127,6 +129,14 @@ const App: React.FC = () => {
           aria-label="Toggle theme"
         >
           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="p-3 rounded-2xl glass-card text-slate-500 dark:text-slate-400 hover:text-brand-500 dark:hover:text-brand-400 transition-all shadow-sm"
+          aria-label="Settings"
+          title="Настройки"
+        >
+          <Settings size={20} />
         </button>
         <button
           onClick={handleLogout}
@@ -171,6 +181,11 @@ const App: React.FC = () => {
         <footer className="mt-20 text-slate-400 dark:text-slate-600 text-sm font-medium tracking-wide animate-fade-in">
           Made by D.Belov
         </footer>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
