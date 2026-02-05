@@ -81,9 +81,6 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
     try {
       // Просто передаем тип, промпт выберет сервер
       const data = await processBrief(file.content, selectedBriefType, selectedModel);
-      console.log('📥 RECEIVED DATA FROM API:', data);
-      console.log('📥 DATA KEYS:', Object.keys(data));
-      console.log('📥 DATA TYPE:', typeof data);
       setResult(data);
     } catch (err: any) {
       setError(err.message || "Ошибка обработки");
@@ -95,14 +92,10 @@ const BriefProcessor: React.FC<Props> = ({ onBack, onNavigate }) => {
   const handleDownload = async () => {
     if (result && file) {
       try {
-        console.log('📤 DOWNLOADING EXCEL WITH RESULT:', result);
-        console.log('📤 RESULT KEYS:', Object.keys(result));
-        console.log('📤 RESULT VALUES:', Object.values(result).map(v => typeof v === 'string' ? v.substring(0, 100) : v));
         // Use the new function that adds column G to original file
         await addCorrectionColumnToExcel(file.file, result);
-        console.log('✅ EXCEL DOWNLOAD COMPLETE');
       } catch (err) {
-        console.error('❌ Error generating Excel:', err);
+        console.error('Error generating Excel:', err);
         setError('Ошибка при создании файла Excel');
       }
     }

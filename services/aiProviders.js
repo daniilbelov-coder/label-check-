@@ -17,28 +17,20 @@ class ReplicateProvider extends AIProvider {
 
   async waitForPrediction(predictionId) {
     const maxAttempts = 180; // 6 minutes max
-    console.log(`⏳ Waiting for prediction ${predictionId}...`);
-
     for (let i = 0; i < maxAttempts; i++) {
       const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
         headers: { 'Authorization': `Bearer ${this.apiKey}` },
       });
       const prediction = await response.json();
 
-      console.log(`⏳ Attempt ${i + 1}/${maxAttempts}: status = ${prediction.status}`);
-
       if (prediction.status === 'succeeded') {
-        console.log('✅ Prediction succeeded!');
         return prediction.output;
       } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
-        console.error('❌ Prediction failed:', prediction.error);
         throw new Error(prediction.error || 'Prediction failed');
       }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
-
-    console.error('❌ Prediction timeout after', maxAttempts * 2, 'seconds');
     throw new Error('Prediction timeout');
   }
 
@@ -80,15 +72,6 @@ class ReplicateProvider extends AIProvider {
     // Use model identifier endpoint (owner/model-name)
     const apiUrl = `https://api.replicate.com/v1/models/${model}/predictions`;
 
-    console.log('🚀 Creating Replicate prediction for model:', model);
-    console.log('🚀 Input config:', {
-      promptLength: input.prompt?.length,
-      temperature: input.temperature,
-      maxTokens: input[inputMapping.maxTokens] || 'not set',
-      hasSystemPrompt: !!input[inputMapping.systemPrompt],
-      imageCount: input[inputMapping.images]?.length || 0
-    });
-
     const createResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -118,8 +101,6 @@ class ReplicateProvider extends AIProvider {
 
     const prediction = await createResponse.json();
 
-    console.log('📊 Replicate prediction status:', prediction.status);
-
     // If prediction is still processing, poll for result
     let output;
     if (prediction.status === 'succeeded') {
@@ -132,24 +113,7 @@ class ReplicateProvider extends AIProvider {
       output = await this.waitForPrediction(prediction.id);
     }
 
-    console.log('📊 Output type:', typeof output, 'is array:', Array.isArray(output));
-
-    if (Array.isArray(output)) {
-      console.log('📊 Array length:', output.length, 'elements');
-      console.log('📊 Array elements:');
-      output.forEach((item, i) => {
-        console.log(`   [${i}]: "${item.substring(0, 60)}${item.length > 60 ? '...' : ''}"`);
-      });
-    } else {
-      console.log('📊 Raw output:', output?.substring?.(0, 200));
-    }
-
-    const finalResult = typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
-    console.log('📊 Final result length:', finalResult.length, 'chars');
-    console.log('📊 Final result starts with:', finalResult.substring(0, 100));
-    console.log('📊 Final result ends with:', finalResult.substring(finalResult.length - 100));
-
-    return finalResult;
+    return typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
   }
 }
 

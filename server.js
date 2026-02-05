@@ -237,43 +237,14 @@ const server = http.createServer(async (req, res) => {
         modelId: requestModelId
       });
 
-      console.log('🔍 RAW AI RESPONSE LENGTH:', result.length, 'chars');
-      console.log('🔍 RAW AI RESPONSE PREVIEW:', result.substring(0, 300));
-      console.log('🔍 RAW AI RESPONSE END:', result.substring(result.length - 100));
-
       // Try to parse JSON from response
       let parsed;
-      let jsonStr = result;
-
-      // Step 1: Remove markdown code blocks if present
-      // Match both complete blocks and incomplete blocks
-      if (result.includes('```json')) {
-        // Remove opening marker
-        jsonStr = result.replace(/```json\s*/g, '');
-        // Remove closing marker if present
-        jsonStr = jsonStr.replace(/```\s*$/g, '');
-        console.log('📝 Removed markdown markers');
-      }
-
-      // Step 2: Extract just the JSON object
-      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[0];
-        console.log('📝 Extracted JSON from text, length:', jsonStr.length);
-      }
-
-      // Step 3: Parse the JSON
       try {
+        // Find JSON in the response (might be wrapped in markdown code blocks)
+        const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) || result.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : result;
         parsed = JSON.parse(jsonStr);
-        console.log('✅ PARSED JSON KEYS:', Object.keys(parsed));
-        console.log('✅ PARSED JSON VALUES PREVIEW:');
-        Object.keys(parsed).slice(0, 3).forEach(key => {
-          console.log(`   "${key}": ${parsed[key].substring(0, 80)}...`);
-        });
-      } catch (e) {
-        console.error('❌ JSON PARSE ERROR:', e.message);
-        console.error('❌ ATTEMPTED TO PARSE (first 300 chars):', jsonStr.substring(0, 300));
-        console.error('❌ ATTEMPTED TO PARSE (last 100 chars):', jsonStr.substring(jsonStr.length - 100));
+      } catch {
         parsed = { "Результат": result };
       }
 

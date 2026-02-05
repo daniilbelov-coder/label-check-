@@ -145,54 +145,44 @@ export const addCorrectionColumnToExcel = async (
           headerRow[6] = "Исправленный текст";
         }
 
-        // DEBUG: Log corrections keys
-        console.log('📋 Corrections keys:', Object.keys(corrections));
-        console.log('📋 Corrections object:', corrections);
-
         // Iterate through rows and match block names from column A
         jsonData.forEach((row: any, index) => {
           if (index === 0 || !Array.isArray(row)) return; // Skip header row
-          
+
           const blockName = row[0]; // Column A
-          
+
           if (blockName && typeof blockName === 'string') {
             const trimmedBlockName = blockName.trim();
             // Extract first line only (before \r\n or \n) to match correction keys
             const firstLine = trimmedBlockName.split(/[\r\n]+/)[0].trim();
 
-            // DEBUG: Log each row attempt
-            console.log(`🔍 Row ${index}: Column A = "${firstLine}"`);
-
             // Find matching correction by block name (case-insensitive)
             let correction = corrections[firstLine];
-            
+
             // If exact match not found, try case-insensitive exact match
             if (!correction) {
-              const caseInsensitiveKey = Object.keys(corrections).find(key => 
+              const caseInsensitiveKey = Object.keys(corrections).find(key =>
                 key.toUpperCase() === firstLine.toUpperCase()
               );
               if (caseInsensitiveKey) {
                 correction = corrections[caseInsensitiveKey];
               }
             }
-            
+
             // If still no match, try finding a key that starts with the first line (case-insensitive)
             if (!correction) {
-              const matchingKey = Object.keys(corrections).find(key => 
-                firstLine.toUpperCase().startsWith(key.toUpperCase()) || 
+              const matchingKey = Object.keys(corrections).find(key =>
+                firstLine.toUpperCase().startsWith(key.toUpperCase()) ||
                 key.toUpperCase().startsWith(firstLine.toUpperCase())
               );
               if (matchingKey) {
                 correction = corrections[matchingKey];
               }
             }
-            
+
             if (correction) {
               // Add correction to column G (index 6)
-              console.log(`✅ Row ${index}: MATCHED! Adding correction (length: ${correction.length} chars)`);
               row[6] = correction;
-            } else {
-              console.log(`❌ Row ${index}: NO MATCH for "${firstLine}"`);
             }
           }
         });
