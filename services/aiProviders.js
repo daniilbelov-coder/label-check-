@@ -17,15 +17,27 @@ class ReplicateProvider extends AIProvider {
 
   async waitForPrediction(predictionId) {
     const maxAttempts = 180; // 6 minutes max
+    let lastStatus = '';
     for (let i = 0; i < maxAttempts; i++) {
       const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
         headers: { 'Authorization': `Bearer ${this.apiKey}` },
       });
       const prediction = await response.json();
 
+      // Log status changes
+      if (prediction.status !== lastStatus) {
+        console.log(`[Replicate] Prediction ${predictionId} status: ${prediction.status}`);
+        lastStatus = prediction.status;
+      }
+
       if (prediction.status === 'succeeded') {
+        console.log(`[Replicate] Prediction completed. Output type: ${typeof prediction.output}, Is array: ${Array.isArray(prediction.output)}`);
+        if (Array.isArray(prediction.output)) {
+          console.log(`[Replicate] Array length: ${prediction.output.length}`);
+        }
         return prediction.output;
       } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
+        console.error(`[Replicate] Prediction failed/canceled:`, prediction.error);
         throw new Error(prediction.error || 'Prediction failed');
       }
 
@@ -83,9 +95,9 @@ class ReplicateProvider extends AIProvider {
       input[inputSchema.systemPromptKey] = systemPrompt;
     }
 
-    // Max tokens
+    // Max tokens (use higher limit to avoid truncation)
     if (inputSchema.maxTokensKey) {
-      input[inputSchema.maxTokensKey] = 8192;
+      input[inputSchema.maxTokensKey] = 16384;
     }
 
     // Images
