@@ -120,6 +120,16 @@ class ReplicateProvider extends AIProvider {
     const prediction = await createResponse.json();
     const output = await this.waitForPrediction(prediction.id);
 
+    // Debug logging for Gemini 3 Flash
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Replicate output type:', typeof output);
+      console.log('Is array:', Array.isArray(output));
+      if (Array.isArray(output)) {
+        console.log('Array length:', output.length);
+        console.log('First element:', output[0]?.substring(0, 100));
+      }
+    }
+
     // Handle structured output from GPT-5
     if (supportsJsonSchema && briefType) {
       // GPT-5 Structured returns { text: "...", json_output: {...} }
@@ -128,7 +138,18 @@ class ReplicateProvider extends AIProvider {
       }
     }
 
-    return typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
+    // Handle different output formats
+    if (typeof output === 'string') {
+      return output;
+    } else if (Array.isArray(output)) {
+      // Gemini 3 Flash returns array of strings - join them all
+      return output.map(item => String(item)).join('');
+    } else if (output && typeof output === 'object') {
+      // Some models return objects
+      return JSON.stringify(output);
+    }
+
+    return String(output);
   }
 }
 
