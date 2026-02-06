@@ -3,6 +3,7 @@ import { Scan, FileText, CheckCheck, FileSpreadsheet, ChevronRight, Sun, Moon, L
 import BriefProcessor from './components/BriefProcessor';
 import LabelComparator from './components/LabelComparator';
 import FinalCheck from './components/FinalCheck';
+import TextCheck from './components/TextCheck';
 import Login from './components/Login';
 import SettingsModal from './components/Settings';
 import { AppView } from './types';
@@ -60,9 +61,11 @@ const App: React.FC = () => {
         return <LabelComparator onBack={() => setCurrentView('home')} onNavigate={setCurrentView} />;
       case 'final':
         return <FinalCheck onBack={() => setCurrentView('home')} onNavigate={setCurrentView} />;
+      case 'textcheck':
+        return <TextCheck onBack={() => setCurrentView('home')} onNavigate={setCurrentView} />;
       default:
         return (
-          <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full animate-fade-up">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto w-full animate-fade-up">
             {/* Block 1: Brief */}
             <button 
               onClick={() => setCurrentView('brief')}
@@ -98,7 +101,7 @@ const App: React.FC = () => {
             </button>
 
             {/* Block 3: Proofread */}
-            <button 
+            <button
               onClick={() => setCurrentView('final')}
               className="group bg-white dark:bg-slate-900 p-10 rounded-[40px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 hover:shadow-2xl hover:ring-brand-100 dark:hover:ring-brand-900 transition-all text-left flex flex-col h-full"
             >
@@ -111,6 +114,23 @@ const App: React.FC = () => {
               </p>
               <div className="inline-flex items-center text-brand-600 dark:text-brand-400 font-bold text-sm tracking-wide group-hover:gap-2 transition-all">
                 НАЧАТЬ ПРОВЕРКУ <ChevronRight size={16} />
+              </div>
+            </button>
+
+            {/* Block 4: Text Check */}
+            <button
+              onClick={() => setCurrentView('textcheck')}
+              className="group bg-white dark:bg-slate-900 p-10 rounded-[40px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 hover:shadow-2xl hover:ring-brand-100 dark:hover:ring-brand-900 transition-all text-left flex flex-col h-full"
+            >
+              <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/30 text-brand-500 rounded-[24px] flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-brand-500 group-hover:text-white transition-all duration-500">
+                <FileText size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Проверка текстов</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed mb-8 flex-grow">
+                Проверьте произвольный текст на орфографию, пунктуацию и стилистику. ИИ исправит кавычки, тире и укажет на ошибки.
+              </p>
+              <div className="inline-flex items-center text-brand-600 dark:text-brand-400 font-bold text-sm tracking-wide group-hover:gap-2 transition-all">
+                ПРОВЕРИТЬ ТЕКСТ <ChevronRight size={16} />
               </div>
             </button>
           </div>

@@ -104,6 +104,38 @@ export const proofreadLabel = async (
   return data.result || 'Пустой ответ от API';
 };
 
+// --- SERVICE 4: TEXT CHECK ---
+/**
+ * Проверка текста (без изображений и Excel)
+ */
+export const checkText = async (text: string, modelId?: string): Promise<string> => {
+  const apiSecret = localStorage.getItem('api_secret');
+
+  if (!apiSecret) {
+    throw new Error('API secret не найден. Пожалуйста, авторизуйтесь снова.');
+  }
+
+  const response = await fetch('/api/check-text', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': apiSecret
+    },
+    body: JSON.stringify({
+      text,
+      modelId: modelId || undefined
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || `API Error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.result;
+};
+
 // --- SERVICE 4: GET AVAILABLE MODELS ---
 export const getAvailableModels = async (filter?: 'images' | 'text') => {
   const params = filter ? `?filter=${filter}` : '';

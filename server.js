@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createAIProvider } from './services/aiProviders.js';
 import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
-import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts, getPromptsETag, getPromptsMetadata } from './services/prompts.js';
+import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, TEXT_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts, getPromptsETag, getPromptsMetadata } from './services/prompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -365,6 +365,51 @@ const server = http.createServer(async (req, res) => {
         error: 'Не удалось проверить этикетку.',
         details: err.message,
         model: requestModelId
+      });
+    }
+    return;
+  }
+
+  // ===== API: TEXT CHECK (простая проверка текста) =====
+  if (req.method === 'POST' && req.url === '/api/check-text') {
+    if (!checkRateLimit(req, res)) return;
+    if (!requireApiAuth(req, res)) return;
+
+    let requestModelId = DEFAULT_MODEL;
+    try {
+      const { text, modelId } = await parseBody(req);
+      requestModelId = modelId || DEFAULT_MODEL;
+
+      // Валидация
+      const validation = validateInput({ text }, ['text']);
+      if (!validation.valid) {
+        return sendJSON(res, 400, { error: validation.error });
+      }
+
+      // Сервер выбирает промпт для проверки текста
+      const systemPrompt = TEXT_CHECK_SYSTEM_PROMPT;
+
+      if (NODE_ENV === 'development') {
+        console.log('Checking text with model:', requestModelId);
+      }
+
+      const result = await callAI({
+        prompt: text,
+        systemPrompt,
+        modelId: requestModelId
+      });
+
+      sendJSON(res, 200, { result });
+    } catch (err) {
+      console.error('Error checking text:', {
+        message: err.message,
+        stack: err.stack,
+        model: requestModelId,
+        timestamp: new Date().toISOString()
+      });
+      sendJSON(res, 500, {
+        error: 'Не удалось проверить текст. Попробуйте позже.',
+        details: NODE_ENV === 'development' ? err.message : undefined
       });
     }
     return;

@@ -25,6 +25,6 @@ export interface DragDropProps {
   description: string;
 }
 
-export type AppView = 'home' | 'brief' | 'compare' | 'final';
+export type AppView = 'home' | 'brief' | 'compare' | 'final' | 'textcheck';
 
 export type BriefType = 'food' | 'nonfood' | 'inter' | 'ge';

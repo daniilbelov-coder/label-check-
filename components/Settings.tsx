@@ -5,20 +5,22 @@ interface Props {
   onClose: () => void;
 }
 
-type PromptType = 'food' | 'nonfood' | 'inter' | 'ge';
+type PromptType = 'food' | 'nonfood' | 'inter' | 'ge' | 'textcheck';
 
 interface Prompts {
   food: string;
   nonfood: string;
   inter: string;
   ge: string;
+  textcheck: string;
 }
 
 const PROMPT_LABELS: Record<PromptType, string> = {
   food: 'Фуд',
   nonfood: 'Нон-фуд',
   inter: 'Межнар',
-  ge: 'ГЕ'
+  ge: 'ГЕ',
+  textcheck: 'Проверка текстов'
 };
 
 const Settings: React.FC<Props> = ({ onClose }) => {
@@ -26,7 +28,8 @@ const Settings: React.FC<Props> = ({ onClose }) => {
     food: '',
     nonfood: '',
     inter: '',
-    ge: ''
+    ge: '',
+    textcheck: ''
   });
   const [activeTab, setActiveTab] = useState<PromptType>('food');
   const [isLoading, setIsLoading] = useState(true);
