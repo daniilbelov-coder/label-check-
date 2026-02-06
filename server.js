@@ -239,7 +239,8 @@ const server = http.createServer(async (req, res) => {
       let parsed;
       try {
         // Find JSON in the response (might be wrapped in markdown code blocks)
-        const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) || result.match(/\{[\s\S]*\}/);
+        // Use greedy match to capture all content, not just until first ```
+        const jsonMatch = result.match(/```json\s*([\s\S]*)\s*```/) || result.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : result;
         parsed = JSON.parse(jsonStr);
       } catch {
