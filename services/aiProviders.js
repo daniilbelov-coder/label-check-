@@ -95,9 +95,15 @@ class ReplicateProvider extends AIProvider {
       input[inputSchema.systemPromptKey] = systemPrompt;
     }
 
-    // Max tokens (use higher limit to avoid truncation)
+    // Max tokens (use maximum limit to avoid truncation)
     if (inputSchema.maxTokensKey) {
-      input[inputSchema.maxTokensKey] = 16384;
+      // Use maximum allowed by model (65535 for Gemini 3 Flash)
+      input[inputSchema.maxTokensKey] = 65535;
+    }
+
+    // For Gemini 3 Flash: use low thinking level to save tokens for output
+    if (this.modelConfig.id === 'gemini-3-flash') {
+      input.thinking_level = 'low';
     }
 
     // Images
