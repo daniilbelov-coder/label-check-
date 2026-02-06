@@ -17,13 +17,39 @@ export const ALL_MODELS = [
     provider: 'yandex',
     description: 'Облегченная модель Yandex'
   },
-  // Google Gemini 2.5 Flash (via Replicate)
+  // Google Gemini 2.5 Flash (via Replicate) - Community Model
   {
     id: 'gemini-2.5-flash',
     model: 'gemini-2.5-flash',
     displayName: 'Google Gemini 2.5 Flash',
     provider: 'replicate',
+    modelType: 'community',
+    versionId: 'bfb7df9586ae4fafa00a593d8dc4868698f72cf9d695da28b8c8a70f88e876ba',
+    inputSchema: {
+      systemPromptKey: 'system_instruction',
+      maxTokensKey: 'max_output_tokens',
+      imagesKey: 'images'
+    },
     description: 'Быстрая модель (через Replicate)'
+  },
+  // OpenAI GPT-5 Structured (via Replicate) - Official Model
+  {
+    id: 'gpt-5-structured',
+    model: 'gpt-5-structured',
+    displayName: 'OpenAI GPT-5 Structured',
+    provider: 'replicate',
+    modelType: 'official',
+    modelName: 'openai/gpt-5-structured',
+    inputSchema: {
+      modelKey: 'model',
+      systemPromptKey: 'instructions',
+      maxTokensKey: 'max_output_tokens',
+      imagesKey: 'image_input',
+      jsonSchemaKey: 'json_schema'
+    },
+    requiresModel: true,
+    supportsJsonSchema: true,
+    description: 'GPT-5 с поддержкой structured output'
   }
 ];
 

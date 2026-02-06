@@ -7,12 +7,12 @@ class AIProvider {
   }
 }
 
-// Replicate Provider (Google Gemini via Replicate)
+// Replicate Provider (supports both Community and Official models)
 class ReplicateProvider extends AIProvider {
-  constructor(apiKey) {
+  constructor(apiKey, modelConfig) {
     super();
     this.apiKey = apiKey;
-    this.modelVersion = 'bfb7df9586ae4fafa00a593d8dc4868698f72cf9d695da28b8c8a70f88e876ba';
+    this.modelConfig = modelConfig;
   }
 
   async waitForPrediction(predictionId) {
@@ -34,15 +34,74 @@ class ReplicateProvider extends AIProvider {
     throw new Error('Prediction timeout');
   }
 
-  async generateText({ prompt, systemPrompt, images = [] }) {
+  buildBriefSchema(briefType) {
+    // JSON schema for brief processing (all types use same structure)
+    return {
+      format: {
+        type: 'json_schema',
+        name: 'product_brief',
+        schema: {
+          type: 'object',
+          properties: {
+            'Наименование продукции': { type: 'string' },
+            'Состав': { type: 'string' },
+            'Пищевая и энергетическая ценность (калорийность)': { type: 'string' },
+            'Условия хранения': { type: 'string' },
+            'Дата изготовления и срок годности': { type: 'string' },
+            'Исправленный текст': { type: 'string' }
+          },
+          required: [
+            'Наименование продукции',
+            'Состав',
+            'Пищевая и энергетическая ценность (калорийность)',
+            'Условия хранения',
+            'Дата изготовления и срок годности',
+            'Исправленный текст'
+          ],
+          additionalProperties: false
+        }
+      }
+    };
+  }
+
+  async generateText({ prompt, systemPrompt, images = [], briefType = null }) {
+    const { modelType, versionId, modelName, inputSchema, requiresModel, supportsJsonSchema } = this.modelConfig;
+
+    // Build input with dynamic parameters
     const input = {
       prompt,
       temperature: 0.1,
-      max_output_tokens: 8192,
     };
 
-    if (systemPrompt) input.system_instruction = systemPrompt;
-    if (images.length > 0) input.images = images;
+    // Special: GPT-5 Structured requires model parameter
+    if (requiresModel && inputSchema.modelKey) {
+      input[inputSchema.modelKey] = 'gpt-5-nano';
+    }
+
+    // System prompt (key varies by model)
+    if (systemPrompt && inputSchema.systemPromptKey) {
+      input[inputSchema.systemPromptKey] = systemPrompt;
+    }
+
+    // Max tokens
+    if (inputSchema.maxTokensKey) {
+      input[inputSchema.maxTokensKey] = 8192;
+    }
+
+    // Images
+    if (images.length > 0 && inputSchema.imagesKey) {
+      input[inputSchema.imagesKey] = images;
+    }
+
+    // JSON Schema for structured output (GPT-5 Structured)
+    if (supportsJsonSchema && briefType && inputSchema.jsonSchemaKey) {
+      input[inputSchema.jsonSchemaKey] = this.buildBriefSchema(briefType);
+    }
+
+    // Choose API format based on model type
+    const requestBody = modelType === 'community'
+      ? { version: versionId, input }  // Community: use version hash
+      : { version: modelName, input };  // Official: use model name string
 
     const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
@@ -50,7 +109,7 @@ class ReplicateProvider extends AIProvider {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ version: this.modelVersion, input }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!createResponse.ok) {
@@ -60,6 +119,14 @@ class ReplicateProvider extends AIProvider {
 
     const prediction = await createResponse.json();
     const output = await this.waitForPrediction(prediction.id);
+
+    // Handle structured output from GPT-5
+    if (supportsJsonSchema && briefType) {
+      // GPT-5 Structured returns { text: "...", json_output: {...} }
+      if (output && typeof output === 'object' && output.json_output) {
+        return JSON.stringify(output.json_output);
+      }
+    }
 
     return typeof output === 'string' ? output : (Array.isArray(output) ? output.join('') : JSON.stringify(output));
   }
@@ -126,9 +193,9 @@ export function createAIProvider(modelId, config) {
 
   if (model.provider === 'replicate') {
     if (!config.replicateApiKey) {
-      throw new Error('REPLICATE_API_KEY is required for Gemini models');
+      throw new Error('REPLICATE_API_KEY is required for Replicate models');
     }
-    return new ReplicateProvider(config.replicateApiKey);
+    return new ReplicateProvider(config.replicateApiKey, model);
   } else if (model.provider === 'yandex') {
     if (!config.yandexApiKey) {
       throw new Error('YANDEX_CLOUD_API_KEY is required for Yandex models');

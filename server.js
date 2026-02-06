@@ -32,14 +32,14 @@ const mimeTypes = {
 };
 
 // Unified AI call helper
-async function callAI({ prompt, systemPrompt, images = [], modelId = DEFAULT_MODEL }) {
+async function callAI({ prompt, systemPrompt, images = [], modelId = DEFAULT_MODEL, briefType = null }) {
   const provider = createAIProvider(modelId, {
     replicateApiKey: REPLICATE_API_KEY,
     yandexApiKey: YANDEX_API_KEY,
     yandexFolderId: YANDEX_FOLDER_ID
   });
 
-  return await provider.generateText({ prompt, systemPrompt, images });
+  return await provider.generateText({ prompt, systemPrompt, images, briefType });
 }
 
 // Parse request body
@@ -231,7 +231,8 @@ const server = http.createServer(async (req, res) => {
       const result = await callAI({
         prompt: `Обработай следующий текст брифа согласно инструкциям и верни результат СТРОГО в формате JSON:\n\n${text}`,
         systemPrompt,
-        modelId: requestModelId
+        modelId: requestModelId,
+        briefType
       });
 
       // Try to parse JSON from response
