@@ -32,14 +32,14 @@ export const ALL_MODELS = [
     },
     description: 'Быстрая модель (через Replicate)'
   },
-  // Google Gemini 3 Flash (via Replicate) - Community Model
+  // Google Gemini 3 Flash (via Replicate) - Official Model
   {
     id: 'gemini-3-flash',
     model: 'gemini-3-flash',
     displayName: 'Google Gemini 3 Flash',
     provider: 'replicate',
-    modelType: 'community',
-    versionId: '12917939800a325e127c528db67c32fe8a23a51c0400690e68c8731c2508c553',
+    modelType: 'official',
+    modelName: 'google/gemini-3-flash',
     inputSchema: {
       systemPromptKey: 'system_instruction',
       maxTokensKey: 'max_output_tokens',
