@@ -120,15 +120,28 @@ class ReplicateProvider extends AIProvider {
     const prediction = await createResponse.json();
     const output = await this.waitForPrediction(prediction.id);
 
-    // Debug logging for Gemini 3 Flash
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Replicate output type:', typeof output);
-      console.log('Is array:', Array.isArray(output));
-      if (Array.isArray(output)) {
-        console.log('Array length:', output.length);
-        console.log('First element:', output[0]?.substring(0, 100));
-      }
+    // Debug logging - ALWAYS log for debugging
+    console.log('=== REPLICATE OUTPUT DEBUG ===');
+    console.log('Model:', this.modelConfig.displayName);
+    console.log('Version:', this.modelConfig.versionId || this.modelConfig.modelName);
+    console.log('Output type:', typeof output);
+    console.log('Is array:', Array.isArray(output));
+
+    if (Array.isArray(output)) {
+      console.log('Array length:', output.length);
+      output.forEach((item, idx) => {
+        console.log(`  [${idx}] type: ${typeof item}, length: ${String(item).length}`);
+        console.log(`  [${idx}] first 100 chars:`, String(item).substring(0, 100));
+      });
+      const joined = output.map(item => String(item)).join('');
+      console.log('Total joined length:', joined.length);
+      console.log('Joined first 200 chars:', joined.substring(0, 200));
+      console.log('Joined last 200 chars:', joined.substring(Math.max(0, joined.length - 200)));
+    } else {
+      console.log('Output length:', String(output).length);
+      console.log('Output sample:', String(output).substring(0, 200));
     }
+    console.log('=== END DEBUG ===');
 
     // Handle structured output from GPT-5
     if (supportsJsonSchema && briefType) {
