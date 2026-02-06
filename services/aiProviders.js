@@ -103,6 +103,12 @@ class ReplicateProvider extends AIProvider {
       ? { version: versionId, input }  // Community: use version hash
       : { version: modelName, input };  // Official: use model name string
 
+    // Debug: Log the actual request being sent
+    console.log('=== REPLICATE REQUEST DEBUG ===');
+    console.log('Model:', this.modelConfig.displayName);
+    console.log('API Body:', JSON.stringify(requestBody, null, 2));
+    console.log('=== END REQUEST DEBUG ===');
+
     const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
