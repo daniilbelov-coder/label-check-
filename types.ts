@@ -25,6 +25,13 @@ export interface DragDropProps {
   description: string;
 }
 
-export type AppView = 'home' | 'brief' | 'compare' | 'final' | 'textcheck';
+export type AppView =
+  | 'brand-select'
+  | 'lavka'
+  | 'fabrika'
+  | 'brief'
+  | 'compare'
+  | 'final'
+  | 'textcheck';
 
 export type BriefType = 'food' | 'nonfood' | 'inter' | 'ge';
