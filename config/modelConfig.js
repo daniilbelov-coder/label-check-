@@ -8,14 +8,16 @@ export const ALL_MODELS = [
     model: 'yandexgpt',
     displayName: 'YandexGPT',
     provider: 'yandex',
-    description: 'Базовая модель Yandex'
+    description: 'Базовая модель Yandex',
+    capabilities: { images: false, systemPrompt: true },
   },
   {
     id: 'yandexgpt-lite',
     model: 'yandexgpt-lite',
     displayName: 'YandexGPT Lite',
     provider: 'yandex',
-    description: 'Облегченная модель Yandex'
+    description: 'Облегченная модель Yandex',
+    capabilities: { images: false, systemPrompt: true },
   },
   // Google Gemini 2.5 Flash (via Replicate) - Community Model
   {
@@ -28,9 +30,10 @@ export const ALL_MODELS = [
     inputSchema: {
       systemPromptKey: 'system_instruction',
       maxTokensKey: 'max_output_tokens',
-      imagesKey: 'images'
+      imagesKey: 'images',
     },
-    description: 'Быстрая модель (через Replicate)'
+    description: 'Быстрая модель (через Replicate)',
+    capabilities: { images: true, systemPrompt: true },
   },
   // Google Gemini 3 Flash (via Replicate) - Official Model
   {
@@ -43,9 +46,10 @@ export const ALL_MODELS = [
     inputSchema: {
       systemPromptKey: 'system_instruction',
       maxTokensKey: 'max_output_tokens',
-      imagesKey: 'images'
+      imagesKey: 'images',
     },
-    description: 'Самая быстрая модель Google с передовым интеллектом'
+    description: 'Самая быстрая модель Google с передовым интеллектом',
+    capabilities: { images: true, systemPrompt: true },
   },
   // OpenAI GPT-5 Structured (via Replicate) - Official Model
   {
@@ -60,12 +64,13 @@ export const ALL_MODELS = [
       systemPromptKey: 'instructions',
       maxTokensKey: 'max_output_tokens',
       imagesKey: 'image_input',
-      jsonSchemaKey: 'json_schema'
+      jsonSchemaKey: 'json_schema',
     },
     requiresModel: true,
     supportsJsonSchema: true,
-    description: 'GPT-5 с поддержкой structured output'
-  }
+    description: 'GPT-5 с поддержкой structured output',
+    capabilities: { images: true, systemPrompt: true },
+  },
 ];
 
 export const DEFAULT_MODEL = 'yandexgpt';

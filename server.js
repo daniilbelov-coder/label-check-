@@ -215,13 +215,11 @@ const server = http.createServer(async (req, res) => {
       const { text, briefType, modelId } = await parseBody(req);
       requestModelId = modelId || DEFAULT_MODEL;
 
-      // Валидация
       const validation = validateInput({ text }, ['text']);
       if (!validation.valid) {
         return sendJSON(res, 400, { error: validation.error });
       }
 
-      // Сервер выбирает промпт, клиент не отправляет его
       const systemPrompt = BRIEF_PROMPTS[briefType] || BRIEF_PROMPTS.food;
 
       if (NODE_ENV === 'development') {
@@ -232,7 +230,7 @@ const server = http.createServer(async (req, res) => {
         prompt: `Обработай следующий текст брифа согласно инструкциям и верни результат СТРОГО в формате JSON:\n\n${text}`,
         systemPrompt,
         modelId: requestModelId,
-        briefType
+        briefType,
       });
 
       // Try to parse JSON from response
@@ -274,16 +272,13 @@ const server = http.createServer(async (req, res) => {
       const { imageUrl, text, modelId } = await parseBody(req);
       requestModelId = modelId || DEFAULT_MODEL;
 
-      // Валидация
       const validation = validateInput({ imageUrl, text }, ['imageUrl', 'text']);
       if (!validation.valid) {
         return sendJSON(res, 400, { error: validation.error });
       }
 
-      // Сервер использует свой промпт
       const systemPrompt = COMPARISON_SYSTEM_PROMPT;
 
-      // Validate model supports images
       const modelConfig = ALL_MODELS.find(m => m.id === requestModelId);
       if (modelConfig && !modelConfig.capabilities?.images) {
         throw new Error(`Model ${requestModelId} does not support image analysis`);
@@ -327,16 +322,13 @@ const server = http.createServer(async (req, res) => {
       const { imageUrl, modelId } = await parseBody(req);
       requestModelId = modelId || DEFAULT_MODEL;
 
-      // Валидация
       const validation = validateInput({ imageUrl }, ['imageUrl']);
       if (!validation.valid) {
         return sendJSON(res, 400, { error: validation.error });
       }
 
-      // Сервер использует свой промпт
       const systemPrompt = FINAL_CHECK_SYSTEM_PROMPT;
 
-      // Validate model supports images
       const modelConfig = ALL_MODELS.find(m => m.id === requestModelId);
       if (modelConfig && !modelConfig.capabilities?.images) {
         throw new Error(`Model ${requestModelId} does not support image analysis`);
