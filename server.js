@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { createAIProvider } from './services/aiProviders.js';
 import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
 import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, TEXT_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts, getPromptsETag, getPromptsMetadata } from './services/prompts.js';
+import { FABRIKA_QA_SYSTEM_PROMPT, FABRIKA_SIGN_CHECK_PROMPT } from './services/fabrikaPrompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
