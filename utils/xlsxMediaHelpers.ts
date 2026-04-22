@@ -26,8 +26,7 @@ function arrayBufferToBase64(buf: Uint8Array): string {
   for (let i = 0; i < buf.length; i += chunk) {
     binary += String.fromCharCode(...buf.subarray(i, i + chunk));
   }
-  if (typeof btoa === 'function') return btoa(binary);
-  return Buffer.from(binary, 'binary').toString('base64');
+  return btoa(binary);
 }
 
 export async function extractXlsxMediaFromBuffer(
