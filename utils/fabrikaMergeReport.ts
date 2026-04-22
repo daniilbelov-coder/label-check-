@@ -10,7 +10,13 @@ export interface SignRawResult {
   raw: string;
 }
 
-const CONFIDENCE_VALUES: SignResult['confidence'][] = ['high', 'medium', 'low'];
+const CONFIDENCE_VALUES: ReadonlyArray<SignResult['confidence']> = ['high', 'medium', 'low'];
+
+function normalizeConfidence(value: unknown): SignResult['confidence'] {
+  return CONFIDENCE_VALUES.includes(value as SignResult['confidence'])
+    ? (value as SignResult['confidence'])
+    : 'low';
+}
 
 export function parseSignRaw(raw: string): SignResult {
   const fenceMatch = raw.match(/```json\s*([\s\S]*?)\s*```/);
@@ -20,10 +26,9 @@ export function parseSignRaw(raw: string): SignResult {
   if (candidate) {
     try {
       const parsed = JSON.parse(candidate);
-      const confidence = CONFIDENCE_VALUES.includes(parsed.confidence) ? parsed.confidence : 'low';
       return {
         found: Boolean(parsed.found),
-        confidence,
+        confidence: normalizeConfidence(parsed.confidence),
         location: parsed.location ?? null,
         notes: parsed.notes ?? null,
       };
@@ -53,12 +58,10 @@ function renderLine(name: string, res: SignResult): string {
   } else {
     bits.push('не найден');
   }
-  if (res.confidence === 'low' || res.notes) {
-    const tail = [res.confidence ? `confidence: ${res.confidence}` : null, res.notes]
-      .filter(Boolean)
-      .join(' — ');
-    if (tail) bits.push(tail);
-  }
+  const tailParts: string[] = [];
+  if (res.confidence === 'low') tailParts.push(`confidence: ${res.confidence}`);
+  if (res.notes) tailParts.push(res.notes);
+  if (tailParts.length > 0) bits.push(tailParts.join(' — '));
   return `- ${bits.join(' — ')}`;
 }
 
