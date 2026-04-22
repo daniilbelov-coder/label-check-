@@ -613,17 +613,30 @@ const server = http.createServer(async (req, res) => {
         modelId: requestModelId,
       });
 
-      const signTasks = body.signs.map(sign =>
-        callAI({
-          prompt: `Эталонный знак (первое изображение): ${sign.name}. Проверь, присутствует ли он на макете (последующие изображения).`,
-          systemPrompt: FABRIKA_SIGN_CHECK_PROMPT,
-          images: [sign.dataUrl, ...body.pdfPages],
-          modelId: requestModelId,
-        }).then(raw => ({ name: sign.name, raw }))
-         .catch(err => ({ name: sign.name, raw: `ERROR: ${err.message}` }))
-      );
+      const signConcurrency = Math.min(3, body.signs.length);
+      const signResults = new Array(body.signs.length);
+      let nextSignIdx = 0;
+      const runNextSign = async () => {
+        while (true) {
+          const idx = nextSignIdx++;
+          if (idx >= body.signs.length) return;
+          const sign = body.signs[idx];
+          try {
+            const raw = await callAI({
+              prompt: `Эталонный знак (первое изображение): ${sign.name}. Проверь, присутствует ли он на макете (последующие изображения).`,
+              systemPrompt: FABRIKA_SIGN_CHECK_PROMPT,
+              images: [sign.dataUrl, ...body.pdfPages],
+              modelId: requestModelId,
+            });
+            signResults[idx] = { name: sign.name, raw, error: false };
+          } catch (err) {
+            signResults[idx] = { name: sign.name, raw: `ERROR: ${err.message}`, error: true };
+          }
+        }
+      };
+      const signWorkers = Array.from({ length: signConcurrency }, runNextSign);
 
-      const [mainMd, signResults] = await Promise.all([mainTask, Promise.all(signTasks)]);
+      const [mainMd] = await Promise.all([mainTask, ...signWorkers]);
       const merged = mergeFabrikaReport(mainMd, signResults);
 
       sendJSON(res, 200, { result: merged, signResults, mainMd });
