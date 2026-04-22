@@ -18,7 +18,7 @@ import TextCheck from './components/TextCheck';
 import Login from './components/Login';
 import SettingsModal from './components/Settings';
 import BrandSelector from './components/BrandSelector';
-import FabrikaHome from './components/FabrikaHome';
+import FabrikaQA from './components/FabrikaQA';
 import { AppView } from './types';
 
 const App: React.FC = () => {
@@ -162,7 +162,7 @@ const App: React.FC = () => {
         );
 
       case 'fabrika':
-        return <FabrikaHome onBack={() => setCurrentView('brand-select')} />;
+        return <FabrikaQA onBack={() => setCurrentView('brand-select')} />;
 
       case 'brief':
         return <BriefProcessor onBack={() => setCurrentView('lavka')} onNavigate={setCurrentView} />;
