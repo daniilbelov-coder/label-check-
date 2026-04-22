@@ -51,11 +51,13 @@ const FabrikaQA: React.FC<Props> = ({ onBack }) => {
       setError('Только PDF принимается как макет.');
       return;
     }
+    if (pdfFile?.previewUrl) URL.revokeObjectURL(pdfFile.previewUrl);
     setPdfFile({ file, previewUrl: URL.createObjectURL(file), type: 'label' });
     setError(null);
   };
 
   const reset = () => {
+    if (pdfFile?.previewUrl) URL.revokeObjectURL(pdfFile.previewUrl);
     setXlsxFile(null);
     setPdfFile(null);
     setResult(null);
@@ -69,6 +71,8 @@ const FabrikaQA: React.FC<Props> = ({ onBack }) => {
     if (!xlsxFile || !pdfFile) return;
     setError(null);
     setResult(null);
+    setSignCount(0);
+    setPageCount(0);
 
     try {
       setStage('unpacking');
@@ -141,7 +145,10 @@ const FabrikaQA: React.FC<Props> = ({ onBack }) => {
               accept="application/pdf"
               fileData={pdfFile}
               onFileSelect={handlePdfSelect}
-              onClear={() => setPdfFile(null)}
+              onClear={() => {
+                if (pdfFile?.previewUrl) URL.revokeObjectURL(pdfFile.previewUrl);
+                setPdfFile(null);
+              }}
               title="2. МАКЕТ (PDF)"
               description="Многостраничный PDF макета упаковки"
             />
