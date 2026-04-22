@@ -24,23 +24,28 @@ export async function rasterizePdf(
   const pageCount = Math.min(pdf.numPages, maxPages);
   const pages: string[] = [];
 
-  for (let i = 1; i <= pageCount; i++) {
-    const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D context unavailable');
+  try {
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context unavailable');
 
-    await page.render({ canvasContext: ctx, viewport }).promise;
+      await page.render({ canvasContext: ctx, viewport }).promise;
 
-    const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-    const dataUrl = format === 'jpeg' ? canvas.toDataURL(mime, quality) : canvas.toDataURL(mime);
-    pages.push(dataUrl);
+      const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const dataUrl = format === 'jpeg' ? canvas.toDataURL(mime, quality) : canvas.toDataURL(mime);
+      pages.push(dataUrl);
 
-    canvas.width = 0;
-    canvas.height = 0;
+      page.cleanup();
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  } finally {
+    await pdf.destroy();
   }
 
   return pages;
