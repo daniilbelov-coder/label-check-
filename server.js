@@ -23,6 +23,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const mimeTypes = {
   '.html': 'text/html',
   '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
   '.css': 'text/css',
   '.json': 'application/json',
   '.png': 'image/png',
@@ -30,6 +31,7 @@ const mimeTypes = {
   '.svg': 'image/svg+xml',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.map': 'application/json',
 };
 
 // Unified AI call helper
