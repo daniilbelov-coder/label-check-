@@ -1,6 +1,8 @@
 import { analyzePdfRow } from './fabrikaAnalyze.js';
 
-const ROW_CONCURRENCY = 3;
+// Replicate free-tier accounts (< $10 credit) have burst cap of 5 requests.
+// Serialize rows to stay under the cap; override via env for paid tier.
+const ROW_CONCURRENCY = Number(process.env.FABRIKA_ROW_CONCURRENCY) || 1;
 
 /**
  * Run every pending row of the job to completion. Non-blocking — returns

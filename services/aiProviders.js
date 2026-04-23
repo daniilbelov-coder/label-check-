@@ -127,14 +127,28 @@ class ReplicateProvider extends AIProvider {
     console.log('API Body:', JSON.stringify(requestBody, null, 2));
     console.log('=== END REQUEST DEBUG ===');
 
-    const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const MAX_429_RETRIES = 6;
+    let createResponse;
+    for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+      createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      if (createResponse.status !== 429 || attempt === MAX_429_RETRIES) break;
+      // Replicate sends seconds in Retry-After on 429. Fall back to exp backoff.
+      const hdr = createResponse.headers.get('retry-after');
+      const waitMs = hdr
+        ? Math.max(1, parseFloat(hdr)) * 1000
+        : Math.min(30000, 2000 * Math.pow(2, attempt));
+      console.warn(
+        `[Replicate] 429 throttled, retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt + 1}/${MAX_429_RETRIES})`
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();

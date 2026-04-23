@@ -4,7 +4,7 @@ import { fabrikaMergeReport } from '../utils/fabrikaMergeReport.js';
 import { rasterizePdfBuffer } from './pdfRasterizer.js';
 import { buildSpecText } from './xlsxSpecParser.js';
 
-const SIGN_CONCURRENCY = 3;
+const SIGN_CONCURRENCY = Number(process.env.FABRIKA_SIGN_CONCURRENCY) || 1;
 
 /**
  * Run the full per-PDF QA: rasterize, main QA call, parallel sign checks, merge.
