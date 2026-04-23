@@ -17,6 +17,7 @@ import FinalCheck from './components/FinalCheck';
 import TextCheck from './components/TextCheck';
 import Login from './components/Login';
 import SettingsModal from './components/Settings';
+import FabrikaSettingsModal from './components/FabrikaSettingsModal';
 import BrandSelector from './components/BrandSelector';
 import FabrikaQA from './components/FabrikaQA';
 import { AppView } from './types';
@@ -248,8 +249,11 @@ const App: React.FC = () => {
         </footer>
       )}
 
-      {showSettings && (
+      {showSettings && currentView !== 'fabrika' && (
         <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+      {showSettings && currentView === 'fabrika' && (
+        <FabrikaSettingsModal onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
