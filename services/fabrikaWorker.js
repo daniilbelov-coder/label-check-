@@ -28,6 +28,8 @@ export function runJob(store, jobId, pdfBuffers) {
 
       store.updateRow(jobId, rowId, { status: 'analyzing' });
       const start = Date.now();
+      const signCount = restoreColumn(row, current)?.signs?.length || 0;
+      console.log(`[fabrika] row ${row.pdfName} — analyzing (${signCount} signs)`);
       try {
         const column = restoreColumn(row, current);
         const buf = pdfBuffers.get(row.pdfName);
@@ -38,11 +40,13 @@ export function runJob(store, jobId, pdfBuffers) {
           signs: column?.signs || [],
           settings: current.settings || {},
         });
+        const took = Date.now() - start;
+        console.log(`[fabrika] row ${row.pdfName} — done (${took} ms)`);
         store.updateRow(jobId, rowId, {
           status: 'done',
           mainMd: merged,
           signResults,
-          durationMs: Date.now() - start,
+          durationMs: took,
         });
       } catch (err) {
         console.error(`[fabrika] row ${row.pdfName} failed:`, err.message);

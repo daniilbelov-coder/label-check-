@@ -17,15 +17,17 @@ function getPdfjs() {
 }
 
 /**
- * Rasterise every page of a PDF buffer to a PNG data URI.
+ * Rasterise every page of a PDF buffer to a data URI.
  *
  * @param {Uint8Array | Buffer} pdfBuffer
- * @param {{ dpi?: number, maxPages?: number }} opts
- * @returns {Promise<string[]>}  per-page PNG data URIs
+ * @param {{ dpi?: number, maxPages?: number, format?: 'png' | 'jpeg', quality?: number }} opts
+ * @returns {Promise<string[]>}  per-page data URIs
  */
 export async function rasterizePdfBuffer(pdfBuffer, opts = {}) {
   const dpi = opts.dpi ?? 150;
   const maxPages = opts.maxPages ?? 10;
+  const format = opts.format ?? 'jpeg';
+  const quality = opts.quality ?? 0.85;
   const scale = dpi / 72;
 
   const pdfjs = await getPdfjs();
@@ -56,11 +58,17 @@ export async function rasterizePdfBuffer(pdfBuffer, opts = {}) {
       Math.ceil(viewport.height),
     );
     const ctx = canvas.getContext('2d');
+    // White background so JPEG doesn't render PDF transparency as black.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     // @napi-rs/canvas exposes a DOM-compatible 2d context that pdfjs accepts.
     await page.render({ canvasContext: ctx, viewport, canvasFactory: null })
       .promise;
-    const buf = canvas.toBuffer('image/png');
-    pages.push(`data:image/png;base64,${buf.toString('base64')}`);
+    const buf = format === 'jpeg'
+      ? canvas.toBuffer('image/jpeg', Math.round(quality * 100))
+      : canvas.toBuffer('image/png');
+    const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    pages.push(`data:${mime};base64,${buf.toString('base64')}`);
     page.cleanup();
   }
 
