@@ -7,6 +7,8 @@ export function normalizeFileName(s) {
   return String(s)
     .trim()
     .replace(/\.pdf$/i, '')
+    .replace(/_/g, ' ')           // underscores → spaces
+    .replace(/\s+preview\s*$/i, '') // strip trailing " Preview" suffix
     .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ');
