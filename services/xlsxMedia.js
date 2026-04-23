@@ -79,7 +79,9 @@ function parseRels(xml) {
  * @returns {Promise<Map<string, Array<{ col: number, row: number, imageName: string, dataUrl: string, sizeBytes: number }>>>}
  */
 export async function extractSignsByCell(data, opts = {}) {
-  const { minSizeBytes = 200, maxSizeBytes = 10000 } = opts;
+  // Loose size cap: anchors already restrict us to spec-relevant cells, so we
+  // don't need the tight pictogram heuristic. Some Tuvio signs ship at 50-80 KB.
+  const { minSizeBytes = 100, maxSizeBytes = 500_000 } = opts;
   const zip = await JSZip.loadAsync(data);
   const read = async (p) => {
     const f = zip.file(p);

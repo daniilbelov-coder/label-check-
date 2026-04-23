@@ -3,6 +3,17 @@ import ReactMarkdown from 'react-markdown';
 import type { FabrikaRow } from '../../types';
 import { getRowDetail } from '../../services/fabrikaClient';
 
+function extractSignName(raw: string): string | null {
+  const fence = raw.match(/```json\s*([\s\S]*?)\s*```/);
+  const obj = raw.match(/\{[\s\S]*\}/);
+  const candidate = fence ? fence[1] : obj ? obj[0] : null;
+  if (!candidate) return null;
+  try {
+    const p = JSON.parse(candidate);
+    return typeof p.signName === 'string' && p.signName.trim() ? p.signName.trim() : null;
+  } catch { return null; }
+}
+
 export function RowDetail({ jobId, rowId, row }: { jobId: string; rowId: string; row: FabrikaRow }) {
   const [full, setFull] = useState<FabrikaRow>(row);
   useEffect(() => {
@@ -26,12 +37,18 @@ export function RowDetail({ jobId, rowId, row }: { jobId: string; rowId: string;
         <details>
           <summary className="cursor-pointer text-sm">Знаки ({full.signResults.length})</summary>
           <ul className="mt-2 space-y-2">
-            {full.signResults.map((s, i) => (
-              <li key={i} className="rounded bg-white dark:bg-slate-900 p-2 text-xs">
-                <div className="font-mono">{s.name}</div>
-                {s.error ? <div className="text-red-700 dark:text-red-400">{s.error}</div> : <pre className="whitespace-pre-wrap">{s.raw}</pre>}
-              </li>
-            ))}
+            {full.signResults.map((s, i) => {
+              const niceName = s.error ? null : extractSignName(s.raw);
+              return (
+                <li key={i} className="rounded bg-white dark:bg-slate-900 p-2 text-xs">
+                  <div>
+                    {niceName ? <span className="font-semibold">{niceName}</span> : null}
+                    <span className="ml-2 font-mono text-slate-400 dark:text-slate-500">{s.name}</span>
+                  </div>
+                  {s.error ? <div className="text-red-700 dark:text-red-400">{s.error}</div> : <pre className="whitespace-pre-wrap">{s.raw}</pre>}
+                </li>
+              );
+            })}
           </ul>
         </details>
       )}

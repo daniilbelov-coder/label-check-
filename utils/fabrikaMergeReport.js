@@ -10,6 +10,7 @@ export function parseSignRaw(raw) {
     try {
       const parsed = JSON.parse(candidate);
       return {
+        signName: typeof parsed.signName === 'string' && parsed.signName.trim() ? parsed.signName.trim() : null,
         found: Boolean(parsed.found),
         confidence: normalizeConfidence(parsed.confidence),
         location: parsed.location ?? null,
@@ -18,6 +19,7 @@ export function parseSignRaw(raw) {
     } catch { /* fall through */ }
   }
   return {
+    signName: null,
     found: false,
     confidence: 'low',
     location: null,
@@ -30,12 +32,13 @@ export function fabrikaMergeReport(mainMd, signs) {
   const lines = signs.map(({ name, raw }) => {
     const r = parseSignRaw(raw);
     const marker = !r.found ? '❌' : r.confidence === 'low' ? '⚠️' : '✅';
+    const label = r.signName || name;
     const base = r.found ? (r.location ? `найден (${r.location})` : 'найден') : 'не найден';
     const tailParts = [];
     if (r.confidence === 'low') tailParts.push(`confidence: ${r.confidence}`);
     if (r.notes) tailParts.push(r.notes);
     const tail = tailParts.length ? ' — ' + tailParts.join(' — ') : '';
-    return `- ${marker} ${name} — ${base}${tail}`;
+    return `- ${marker} ${label} — ${base}${tail}`;
   });
   return `${mainMd.trimEnd()}\n\n## Знаки манипуляции (детальная сверка)\n\n${lines.join('\n')}\n`;
 }
