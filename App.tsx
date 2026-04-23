@@ -67,8 +67,7 @@ const App: React.FC = () => {
 
   const isTopLevel =
     currentView === 'brand-select' ||
-    currentView === 'lavka' ||
-    currentView === 'fabrika';
+    currentView === 'lavka';
 
   const renderContent = () => {
     switch (currentView) {

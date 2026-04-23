@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { FabrikaJob, FabrikaRow, FabrikaRowStatus } from '../../types';
+import type { FabrikaJob, FabrikaRowStatus } from '../../types';
 import { RowDetail } from './RowDetail';
 
 const STATUS_BADGE: Record<FabrikaRowStatus, { label: string; css: string }> = {
@@ -16,49 +16,70 @@ export function ResultsTable({ job, jobId, onRetry }: {
   onRetry: (rowId: string) => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b border-slate-200 dark:border-slate-800 text-left text-slate-500 dark:text-slate-400">
-          <th className="py-2">PDF</th>
-          <th>Статус</th>
-          <th>Категория</th>
-          <th>Время, мс</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {job.rows.map((row) => (
-          <React.Fragment key={row.id}>
-            <tr
-              className="cursor-pointer border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-              onClick={() => setExpanded((id) => (id === row.id ? null : row.id))}
-            >
-              <td className="py-2 font-mono text-xs">{row.pdfName}</td>
-              <td>
-                <span className={`rounded px-2 py-0.5 text-xs ${STATUS_BADGE[row.status].css}`}>
-                  {STATUS_BADGE[row.status].label}
-                </span>
-              </td>
-              <td className="text-xs text-slate-500 dark:text-slate-400">{row.matchedColumn?.sheet ?? '—'}</td>
-              <td className="text-xs">{row.durationMs ?? ''}</td>
-              <td>
-                {row.status === 'error' && (
-                  <button
-                    className="text-xs text-blue-600 dark:text-blue-400 underline"
-                    onClick={(e) => { e.stopPropagation(); onRetry(row.id); }}
-                  >retry</button>
-                )}
-              </td>
-            </tr>
-            {expanded === row.id && (
-              <tr><td colSpan={5} className="bg-slate-50 dark:bg-slate-800/60 p-4">
-                <RowDetail jobId={jobId} rowId={row.id} row={row} />
-              </td></tr>
-            )}
-          </React.Fragment>
-        ))}
-      </tbody>
-    </table>
+    <div className="bg-white dark:bg-slate-900 rounded-[32px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
+            <th className="px-6 py-4 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+              PDF
+            </th>
+            <th className="px-2 py-4 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+              Статус
+            </th>
+            <th className="px-2 py-4 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+              Категория
+            </th>
+            <th className="px-2 py-4 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+              Время
+            </th>
+            <th className="px-6 py-4" />
+          </tr>
+        </thead>
+        <tbody>
+          {job.rows.map((row) => (
+            <React.Fragment key={row.id}>
+              <tr
+                className="cursor-pointer border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                onClick={() => setExpanded((id) => (id === row.id ? null : row.id))}
+              >
+                <td className="px-6 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">
+                  {row.pdfName}
+                </td>
+                <td className="px-2 py-3">
+                  <span className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[row.status].css}`}>
+                    {STATUS_BADGE[row.status].label}
+                  </span>
+                </td>
+                <td className="px-2 py-3 text-xs text-slate-500 dark:text-slate-400">
+                  {row.matchedColumn?.sheet ?? '—'}
+                </td>
+                <td className="px-2 py-3 text-xs text-slate-500 dark:text-slate-400">
+                  {row.durationMs ? `${row.durationMs} мс` : ''}
+                </td>
+                <td className="px-6 py-3">
+                  {row.status === 'error' && (
+                    <button
+                      className="text-xs text-brand-600 dark:text-brand-400 font-semibold underline hover:no-underline transition-all"
+                      onClick={(e) => { e.stopPropagation(); onRetry(row.id); }}
+                    >
+                      Повторить
+                    </button>
+                  )}
+                </td>
+              </tr>
+              {expanded === row.id && (
+                <tr>
+                  <td colSpan={5} className="bg-slate-50 dark:bg-slate-800/60 px-6 py-5">
+                    <RowDetail jobId={jobId} rowId={row.id} row={row} />
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
