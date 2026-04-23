@@ -674,6 +674,15 @@ const server = http.createServer(async (req, res) => {
         catch { return sendJSON(res, 400, { error: 'settings должно быть валидным JSON' }); }
       }
 
+      // Optional filter: only process columns whose key is in this set
+      let selectedKeys = null;
+      if (fields.selectedKeys) {
+        try {
+          const arr = JSON.parse(fields.selectedKeys);
+          if (Array.isArray(arr)) selectedKeys = new Set(arr);
+        } catch { /* ignore malformed filter — process all */ }
+      }
+
       const { sheets } = parseBrandSpec(new Uint8Array(files.xlsx));
       const signAnchors = await extractSignsByCell(files.xlsx);
       attachSignsToColumns(sheets, signAnchors);
@@ -698,7 +707,12 @@ const server = http.createServer(async (req, res) => {
       }));
 
       const pdfs = pdfNames.map((name) => {
-        const column = matches.get(name) || null;
+        let column = matches.get(name) || null;
+        // If the user selected specific columns, exclude unselected ones
+        if (column && selectedKeys) {
+          const key = `${column.sheet}::${column.colIndex}`;
+          if (!selectedKeys.has(key)) column = null;
+        }
         return {
           name,
           column,

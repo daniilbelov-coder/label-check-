@@ -104,3 +104,20 @@ export interface FabrikaPromptDefaults {
   qaSystemPrompt: string;
   signCheckPrompt: string;
 }
+
+// ===== Fabrika client-side spec preview =====
+
+export interface FabrikaSpecColumn {
+  sheet: string;
+  colIndex: number;
+  fileName: string;
+  fileNameNormalized: string;
+  modelName: string;
+  pkgType: string;
+  key: string; // `${sheet}::${colIndex}`
+}
+
+export interface FabrikaSpecGroup {
+  modelName: string;
+  columns: FabrikaSpecColumn[];
+}

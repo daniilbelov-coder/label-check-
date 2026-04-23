@@ -16,10 +16,10 @@ export default function FabrikaQA({ onBack }: { onBack?: () => void }) {
 
   useEffect(() => () => { if (pollRef.current) window.clearInterval(pollRef.current); }, []);
 
-  const handleSubmit = async (xlsx: File, zip: File, settings: FabrikaJobSettings) => {
+  const handleSubmit = async (xlsx: File, zip: File, settings: FabrikaJobSettings, selectedKeys: string[]) => {
     setError(null);
     try {
-      const { jobId } = await createJob(xlsx, zip, settings);
+      const { jobId } = await createJob(xlsx, zip, settings, selectedKeys);
       setJobId(jobId);
       setStage('running');
       pollRef.current = window.setInterval(async () => {

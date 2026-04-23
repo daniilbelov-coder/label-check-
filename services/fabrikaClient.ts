@@ -17,11 +17,15 @@ export async function createJob(
   xlsx: File,
   zip: File,
   settings: FabrikaJobSettings,
+  selectedKeys?: string[],
 ): Promise<{ jobId: string; totalPdfs: number; unmatchedColumns: FabrikaJob['unmatchedColumns'] }> {
   const form = new FormData();
   form.append('xlsx', xlsx);
   form.append('zip', zip);
   form.append('settings', JSON.stringify(settings));
+  if (selectedKeys && selectedKeys.length > 0) {
+    form.append('selectedKeys', JSON.stringify(selectedKeys));
+  }
   const res = await fetch('/api/fabrika/jobs', { method: 'POST', headers: headers(), body: form });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
