@@ -19,6 +19,13 @@ dist-ssr
 
 # Prompts data (коммерческая тайна)
 prompts-data.json
+qa_prompt.md
+
+# Docs и research материалы (локально)
+docs/
+
+# Тестовые материалы (локально)
+некорректная маркировка примеры/
 
 # Editor directories and files
 .vscode/*

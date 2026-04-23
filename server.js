@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { createAIProvider } from './services/aiProviders.js';
 import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
 import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, TEXT_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts, getPromptsETag, getPromptsMetadata } from './services/prompts.js';
+import { FABRIKA_QA_SYSTEM_PROMPT, FABRIKA_SIGN_CHECK_PROMPT } from './services/fabrikaPrompts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,6 +23,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const mimeTypes = {
   '.html': 'text/html',
   '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
   '.css': 'text/css',
   '.json': 'application/json',
   '.png': 'image/png',
@@ -29,6 +31,7 @@ const mimeTypes = {
   '.svg': 'image/svg+xml',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.map': 'application/json',
 };
 
 // Unified AI call helper
@@ -125,8 +128,10 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 // === БЕЗОПАСНОСТЬ: Валидация Входных Данных ===
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB в байтах
-const MAX_TEXT_LENGTH = 50000; // 50,000 символов
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB на одно изображение (data URI base64)
+const MAX_TEXT_LENGTH = 150000; // 150,000 символов для длинных ТЗ Fabrika
+const MAX_IMAGES_TOTAL = 20;
+const MAX_IMAGES_TOTAL_BYTES = 60 * 1024 * 1024; // ~45 МБ полезной нагрузки
 
 function validateInput(body, requiredFields) {
   // Проверка обязательных полей
@@ -167,6 +172,89 @@ function validateInput(body, requiredFields) {
   }
 
   return { valid: true };
+}
+
+function validateFabrikaInput(body) {
+  if (typeof body.excelText !== 'string' || body.excelText.trim().length === 0) {
+    return { valid: false, error: 'Отсутствует excelText' };
+  }
+  if (body.excelText.length > MAX_TEXT_LENGTH) {
+    return { valid: false, error: `excelText слишком длинный (максимум ${MAX_TEXT_LENGTH})` };
+  }
+  if (!Array.isArray(body.pdfPages) || body.pdfPages.length === 0) {
+    return { valid: false, error: 'pdfPages пуст' };
+  }
+  if (!Array.isArray(body.signs)) {
+    return { valid: false, error: 'signs не массив' };
+  }
+  const totalImages = body.pdfPages.length + body.signs.length;
+  if (totalImages > MAX_IMAGES_TOTAL) {
+    return { valid: false, error: `Слишком много изображений: ${totalImages} (максимум ${MAX_IMAGES_TOTAL})` };
+  }
+
+  let totalBytes = 0;
+  const checkDataUri = (uri, label) => {
+    if (typeof uri !== 'string' || !uri.startsWith('data:image/')) {
+      return `Неверный формат ${label}`;
+    }
+    if (uri.length > MAX_FILE_SIZE * 1.4) {
+      return `${label} превышает ${MAX_FILE_SIZE} байт`;
+    }
+    totalBytes += uri.length;
+    return null;
+  };
+
+  for (let i = 0; i < body.pdfPages.length; i++) {
+    const err = checkDataUri(body.pdfPages[i], `pdfPages[${i}]`);
+    if (err) return { valid: false, error: err };
+  }
+  for (let i = 0; i < body.signs.length; i++) {
+    const s = body.signs[i];
+    if (!s || typeof s.name !== 'string') return { valid: false, error: `signs[${i}].name отсутствует` };
+    const err = checkDataUri(s.dataUrl, `signs[${i}].dataUrl`);
+    if (err) return { valid: false, error: err };
+  }
+  if (totalBytes > MAX_IMAGES_TOTAL_BYTES) {
+    return { valid: false, error: 'Суммарный размер изображений слишком большой' };
+  }
+
+  return { valid: true };
+}
+
+function parseSignRawJson(raw) {
+  const fence = String(raw).match(/```json\s*([\s\S]*?)\s*```/);
+  const obj = String(raw).match(/\{[\s\S]*\}/);
+  const candidate = fence ? fence[1] : obj ? obj[0] : null;
+  if (!candidate) {
+    return { found: false, confidence: 'low', location: null, notes: `Не распарсили: ${String(raw).slice(0, 200)}` };
+  }
+  try {
+    const parsed = JSON.parse(candidate);
+    const c = ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'low';
+    return {
+      found: Boolean(parsed.found),
+      confidence: c,
+      location: parsed.location ?? null,
+      notes: parsed.notes ?? null,
+    };
+  } catch {
+    return { found: false, confidence: 'low', location: null, notes: `JSON.parse fail: ${String(raw).slice(0, 200)}` };
+  }
+}
+
+function mergeFabrikaReport(mainMd, signResults) {
+  if (!signResults || signResults.length === 0) return mainMd;
+  const lines = signResults.map(({ name, raw }) => {
+    const r = parseSignRawJson(raw);
+    const marker = !r.found ? '❌' : r.confidence === 'low' ? '⚠️' : '✅';
+    const base = r.found ? (r.location ? `найден (${r.location})` : 'найден') : 'не найден';
+    const tailParts = [];
+    if (r.confidence === 'low') tailParts.push(`confidence: ${r.confidence}`);
+    if (r.notes) tailParts.push(r.notes);
+    const tail = tailParts.length ? ' — ' + tailParts.join(' — ') : '';
+    return `- ${marker} ${name} — ${base}${tail}`;
+  });
+  return `${mainMd.trimEnd()}\n\n## Знаки манипуляции (детальная сверка)\n\n${lines.join('\n')}\n`;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -494,6 +582,78 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       console.error('Update Prompts API Error:', err.message);
       sendJSON(res, 500, { error: 'Не удалось сохранить промпты' });
+    }
+    return;
+  }
+
+  // ===== API: FABRIKA MACKET QA =====
+  if (req.method === 'POST' && req.url === '/api/fabrika/analyze') {
+    if (!checkRateLimit(req, res)) return;
+    if (!requireApiAuth(req, res)) return;
+
+    let requestModelId = 'gemini-3-flash';
+    try {
+      const body = await parseBody(req);
+      requestModelId = body.modelId || 'gemini-3-flash';
+
+      const v = validateFabrikaInput(body);
+      if (!v.valid) return sendJSON(res, 400, { error: v.error });
+
+      const modelConfig = ALL_MODELS.find(m => m.id === requestModelId);
+      if (modelConfig && !modelConfig.capabilities?.images) {
+        return sendJSON(res, 400, { error: `Модель ${requestModelId} не поддерживает изображения` });
+      }
+
+      if (NODE_ENV === 'development') {
+        console.log('[Fabrika] main + signs:', 1 + body.signs.length, 'calls, model:', requestModelId);
+      }
+
+      const mainTask = callAI({
+        prompt: `ТЗ (извлечено из Excel):\n${body.excelText}`,
+        systemPrompt: FABRIKA_QA_SYSTEM_PROMPT,
+        images: body.pdfPages,
+        modelId: requestModelId,
+      });
+
+      const signConcurrency = Math.min(3, body.signs.length);
+      const signResults = new Array(body.signs.length);
+      let nextSignIdx = 0;
+      const runNextSign = async () => {
+        while (true) {
+          const idx = nextSignIdx++;
+          if (idx >= body.signs.length) return;
+          const sign = body.signs[idx];
+          try {
+            const raw = await callAI({
+              prompt: `Эталонный знак (первое изображение): ${sign.name}. Проверь, присутствует ли он на макете (последующие изображения).`,
+              systemPrompt: FABRIKA_SIGN_CHECK_PROMPT,
+              images: [sign.dataUrl, ...body.pdfPages],
+              modelId: requestModelId,
+            });
+            signResults[idx] = { name: sign.name, raw, error: false };
+          } catch (err) {
+            signResults[idx] = { name: sign.name, raw: `ERROR: ${err.message}`, error: true };
+          }
+        }
+      };
+      const signWorkers = Array.from({ length: signConcurrency }, runNextSign);
+
+      const [mainMd] = await Promise.all([mainTask, ...signWorkers]);
+      const merged = mergeFabrikaReport(mainMd, signResults);
+
+      sendJSON(res, 200, { result: merged, signResults, mainMd });
+    } catch (err) {
+      console.error('Error in /api/fabrika/analyze:', {
+        message: err.message,
+        stack: err.stack,
+        model: requestModelId,
+        timestamp: new Date().toISOString(),
+      });
+      sendJSON(res, 500, {
+        error: 'Не удалось проверить макет Фабрики.',
+        details: NODE_ENV === 'development' ? err.message : undefined,
+        model: requestModelId,
+      });
     }
     return;
   }

@@ -35,3 +35,27 @@ export type AppView =
   | 'textcheck';
 
 export type BriefType = 'food' | 'nonfood' | 'inter' | 'ge';
+
+export interface FabrikaSignInput {
+  name: string;
+  dataUrl: string;
+}
+
+export interface FabrikaAnalyzeRequest {
+  excelText: string;
+  pdfPages: string[];
+  signs: FabrikaSignInput[];
+  modelId?: string;
+}
+
+export interface FabrikaSignResult {
+  name: string;
+  raw: string;
+  error?: boolean;
+}
+
+export interface FabrikaAnalyzeResponse {
+  result: string;
+  signResults: FabrikaSignResult[];
+  mainMd: string;
+}
