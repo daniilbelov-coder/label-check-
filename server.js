@@ -7,6 +7,12 @@ import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, TEX
 import { FABRIKA_QA_SYSTEM_PROMPT, FABRIKA_SIGN_CHECK_PROMPT } from './services/fabrikaPrompts.js';
 import { callAI } from './services/callAI.js';
 import { fabrikaMergeReport as mergeFabrikaReport } from './utils/fabrikaMergeReport.js';
+import busboy from 'busboy';
+import JSZip from 'jszip';
+import { createJobStore } from './services/fabrikaJobStore.js';
+import { runJob, retryRow } from './services/fabrikaWorker.js';
+import { parseBrandSpec, matchPdfsToColumns, buildSpecText } from './services/xlsxSpecParser.js';
+import { extractFabrikaSigns } from './services/xlsxMedia.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +25,26 @@ const YANDEX_FOLDER_ID = process.env.YANDEX_CLOUD_FOLDER;
 // === БЕЗОПАСНОСТЬ: API Аутентификация ===
 const API_SECRET = process.env.API_SECRET || 'dev-secret-change-me';
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+const fabrikaJobStore = createJobStore();
+const fabrikaJobAssets = new Map(); // jobId -> { pdfBuffers, signs }
+
+function parseFabrikaMultipart(req) {
+  return new Promise((resolve, reject) => {
+    const bb = busboy({ headers: req.headers, limits: { fileSize: 200 * 1024 * 1024 } });
+    const files = {};
+    const fields = {};
+    bb.on('file', (name, stream) => {
+      const chunks = [];
+      stream.on('data', (c) => chunks.push(c));
+      stream.on('end', () => { files[name] = Buffer.concat(chunks); });
+    });
+    bb.on('field', (name, val) => { fields[name] = val; });
+    bb.on('finish', () => resolve({ files, fields }));
+    bb.on('error', reject);
+    req.pipe(bb);
+  });
+}
 
 
 const mimeTypes = {
@@ -609,6 +635,149 @@ const server = http.createServer(async (req, res) => {
         model: requestModelId,
       });
     }
+    return;
+  }
+
+  // ===== API: FABRIKA BATCH JOBS =====
+
+  if (req.method === 'POST' && req.url === '/api/fabrika/jobs') {
+    if (!checkRateLimit(req, res)) return;
+    if (!requireApiAuth(req, res)) return;
+    try {
+      const { files, fields } = await parseFabrikaMultipart(req);
+      if (!files.xlsx || !files.zip) {
+        return sendJSON(res, 400, { error: 'xlsx и zip обязательны' });
+      }
+      let settings = {};
+      if (fields.settings) {
+        try { settings = JSON.parse(fields.settings); }
+        catch { return sendJSON(res, 400, { error: 'settings должно быть валидным JSON' }); }
+      }
+
+      const { sheets } = parseBrandSpec(new Uint8Array(files.xlsx));
+      const mediaSigns = await extractFabrikaSigns(files.xlsx);
+      const zip = await JSZip.loadAsync(files.zip);
+      const pdfEntries = Object.values(zip.files).filter(
+        (e) => !e.dir && /\.pdf$/i.test(e.name)
+      );
+      if (pdfEntries.length === 0) return sendJSON(res, 400, { error: 'в ZIP нет PDF' });
+
+      const pdfNames = pdfEntries.map((e) => e.name);
+      const { matches, unmatchedColumns } = matchPdfsToColumns(pdfNames, sheets);
+
+      const pdfBuffers = new Map();
+      await Promise.all(pdfEntries.map(async (e) => {
+        pdfBuffers.set(e.name, await e.async('nodebuffer'));
+      }));
+
+      const pdfs = pdfNames.map((name) => {
+        const column = matches.get(name) || null;
+        return {
+          name,
+          column,
+          specText: column ? buildSpecText(column) : null,
+        };
+      });
+
+      const job = fabrikaJobStore.create({
+        pdfs,
+        unmatchedColumns: unmatchedColumns.map((c) => ({ sheet: c.sheet, fileName: c.fileName })),
+        settings,
+      });
+      // stash full columns keyed by rowId so the worker can rebuild prompt text
+      job.settings._columns = {};
+      job.rows.forEach((row, i) => {
+        if (pdfs[i].column) job.settings._columns[row.id] = pdfs[i].column;
+      });
+
+      fabrikaJobAssets.set(job.id, { pdfBuffers, signs: mediaSigns });
+      runJob(fabrikaJobStore, job.id, pdfBuffers, mediaSigns);
+
+      sendJSON(res, 200, {
+        jobId: job.id,
+        totalPdfs: job.totalPdfs,
+        unmatchedColumns: job.unmatchedColumns,
+      });
+    } catch (err) {
+      console.error('/api/fabrika/jobs error:', err);
+      sendJSON(res, 500, {
+        error: 'Не удалось создать job',
+        details: NODE_ENV === 'development' ? err.message : undefined,
+      });
+    }
+    return;
+  }
+
+  {
+    const m = req.url && req.url.match(/^\/api\/fabrika\/jobs\/([^/]+)$/);
+    if (req.method === 'GET' && m) {
+      if (!requireApiAuth(req, res)) return;
+      const job = fabrikaJobStore.get(m[1]);
+      if (!job) return sendJSON(res, 404, { error: 'job не найден' });
+      const { _columns, ...settingsSafe } = job.settings || {};
+      const lightRows = job.rows.map(({ mainMd, ...rest }) => rest);
+      sendJSON(res, 200, { ...job, rows: lightRows, settings: settingsSafe });
+      return;
+    }
+  }
+
+  {
+    const m = req.url && req.url.match(/^\/api\/fabrika\/jobs\/([^/]+)\/stream$/);
+    if (req.method === 'GET' && m) {
+      if (!requireApiAuth(req, res)) return;
+      const job = fabrikaJobStore.get(m[1]);
+      if (!job) return sendJSON(res, 404, { error: 'job не найден' });
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
+      const send = (j) => {
+        const lightRows = j.rows.map(({ mainMd, ...rest }) => rest);
+        res.write(`data: ${JSON.stringify({ ...j, rows: lightRows, settings: undefined })}\n\n`);
+      };
+      send(job);
+      const unsub = fabrikaJobStore.subscribe(m[1], send);
+      req.on('close', () => { unsub(); });
+      return;
+    }
+  }
+
+  {
+    const m = req.url && req.url.match(/^\/api\/fabrika\/jobs\/([^/]+)\/rows\/([^/]+)$/);
+    if (req.method === 'GET' && m) {
+      if (!requireApiAuth(req, res)) return;
+      const job = fabrikaJobStore.get(m[1]);
+      if (!job) return sendJSON(res, 404, { error: 'job не найден' });
+      const row = job.rows.find((r) => r.id === m[2]);
+      if (!row) return sendJSON(res, 404, { error: 'row не найден' });
+      sendJSON(res, 200, row);
+      return;
+    }
+  }
+
+  {
+    const m = req.url && req.url.match(/^\/api\/fabrika\/jobs\/([^/]+)\/rows\/([^/]+)\/retry$/);
+    if (req.method === 'POST' && m) {
+      if (!requireApiAuth(req, res)) return;
+      const assets = fabrikaJobAssets.get(m[1]);
+      if (!assets) return sendJSON(res, 404, { error: 'assets для job не найдены (TTL истёк?)' });
+      try {
+        await retryRow(fabrikaJobStore, m[1], m[2], assets.pdfBuffers, assets.signs);
+        sendJSON(res, 200, { ok: true });
+      } catch (err) {
+        sendJSON(res, 400, { error: err.message });
+      }
+      return;
+    }
+  }
+
+  if (req.method === 'GET' && req.url === '/api/fabrika/prompts') {
+    if (!requireApiAuth(req, res)) return;
+    sendJSON(res, 200, {
+      qaSystemPrompt: FABRIKA_QA_SYSTEM_PROMPT,
+      signCheckPrompt: FABRIKA_SIGN_CHECK_PROMPT,
+    });
     return;
   }
 
