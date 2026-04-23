@@ -25,8 +25,11 @@ export async function analyzePdfRow({ pdfBuffer, column, signs, settings = {} })
   const signPrompt = settings.signCheckPrompt?.trim() || FABRIKA_SIGN_CHECK_PROMPT;
   const modelId = settings.modelId || 'gemini-3-flash';
 
+  // Render once at a DPI high enough to read small numerals on pictograms
+  // (e.g. "PAP 21", EAN-13 digits). 200 dpi = ~50 px for a 5 mm glyph.
+  const dpi = Number(process.env.FABRIKA_DPI) || 200;
   const pdfPages = await rasterizePdfBuffer(pdfBuffer, {
-    dpi: 150,
+    dpi,
     maxPages: Math.max(MAIN_QA_MAX_PAGES, SIGN_CHECK_MAX_PAGES),
   });
   const qaPages = pdfPages.slice(0, MAIN_QA_MAX_PAGES);

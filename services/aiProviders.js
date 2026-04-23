@@ -121,44 +121,74 @@ class ReplicateProvider extends AIProvider {
     }
 
     const MAX_429_RETRIES = 6;
-    let createResponse;
-    for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
-      createResponse = await fetch('https://api.replicate.com/v1/predictions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-      if (createResponse.status !== 429 || attempt === MAX_429_RETRIES) break;
-      // Replicate sends seconds in Retry-After on 429. Fall back to exp backoff.
-      const hdr = createResponse.headers.get('retry-after');
-      const waitMs = hdr
-        ? Math.max(1, parseFloat(hdr)) * 1000
-        : Math.min(30000, 2000 * Math.pow(2, attempt));
-      console.warn(
-        `[Replicate] 429 throttled, retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt + 1}/${MAX_429_RETRIES})`
-      );
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
+    const MAX_PREDICTION_RETRIES = 2; // on transient Replicate side errors (E87xx, Director)
 
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      let msg = errorText;
-      try {
-        const ej = JSON.parse(errorText);
-        msg = ej.detail || ej.error || errorText;
-      } catch (_) {
-        /* keep raw */
+    const isTransientPredictionError = (msg) => {
+      const s = String(msg || '').toLowerCase();
+      return (
+        s.includes('e87') ||
+        s.includes('director') ||
+        s.includes('handling prediction') ||
+        s.includes('internal') ||
+        s.includes('timeout') ||
+        s.includes('temporarily') ||
+        s.includes('unavailable')
+      );
+    };
+
+    let output;
+    let predictionAttempt = 0;
+    // outer loop handles transient prediction failures (E8765 etc.)
+    while (true) {
+      let createResponse;
+      for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+        createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+        if (createResponse.status !== 429 || attempt === MAX_429_RETRIES) break;
+        const hdr = createResponse.headers.get('retry-after');
+        const waitMs = hdr
+          ? Math.max(1, parseFloat(hdr)) * 1000
+          : Math.min(30000, 2000 * Math.pow(2, attempt));
+        console.warn(
+          `[Replicate] 429 throttled, retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt + 1}/${MAX_429_RETRIES})`
+        );
+        await new Promise((r) => setTimeout(r, waitMs));
       }
-      throw new Error(
-        `Replicate API Error (${this.modelConfig.id}): HTTP ${createResponse.status} - ${msg}`
-      );
-    }
 
-    const prediction = await createResponse.json();
-    const output = await this.waitForPrediction(prediction.id);
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        let msg = errorText;
+        try {
+          const ej = JSON.parse(errorText);
+          msg = ej.detail || ej.error || errorText;
+        } catch (_) { /* keep raw */ }
+        throw new Error(
+          `Replicate API Error (${this.modelConfig.id}): HTTP ${createResponse.status} - ${msg}`
+        );
+      }
+
+      const prediction = await createResponse.json();
+      try {
+        output = await this.waitForPrediction(prediction.id);
+        break; // success
+      } catch (err) {
+        if (predictionAttempt >= MAX_PREDICTION_RETRIES || !isTransientPredictionError(err.message)) {
+          throw err;
+        }
+        predictionAttempt++;
+        const waitMs = 2000 * Math.pow(2, predictionAttempt - 1);
+        console.warn(
+          `[Replicate] transient prediction error (${err.message}); retrying in ${waitMs / 1000}s (${predictionAttempt}/${MAX_PREDICTION_RETRIES})`
+        );
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+    }
 
     // Opt-in debug dump: set FABRIKA_DEBUG=1 to enable verbose per-call logs.
     if (process.env.FABRIKA_DEBUG) {
