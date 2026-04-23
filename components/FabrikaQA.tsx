@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { FabrikaJob, FabrikaJobSettings } from '../types';
 import { UploadPanel } from './FabrikaQA/UploadPanel';
 import { ResultsTable } from './FabrikaQA/ResultsTable';
-import { UnmatchedColumnsPanel } from './FabrikaQA/UnmatchedColumnsPanel';
 import { createJob, pollJob, retryRow } from '../services/fabrikaClient';
 
 type Stage = 'upload' | 'running' | 'done';
@@ -58,7 +57,6 @@ export default function FabrikaQA(_props: { onBack?: () => void }) {
       {(stage === 'running' || stage === 'done') && job && (
         <>
           <ProgressHeader job={job} />
-          <UnmatchedColumnsPanel columns={job.unmatchedColumns} />
           <ResultsTable job={job} jobId={jobId!} onRetry={handleRetry} />
         </>
       )}

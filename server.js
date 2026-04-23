@@ -17,6 +17,13 @@ import { extractFabrikaSigns } from './services/xlsxMedia.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+if (nodeMajor < 18) {
+  console.error(`\n[FATAL] Node.js >= 18 required (pdfjs-dist 4.x uses ES2021 syntax like ||=).`);
+  console.error(`Current: ${process.version}. Use \`nvm use 20\` or similar and restart.\n`);
+  process.exit(1);
+}
+
 const PORT = process.env.PORT || 3000;
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 const YANDEX_API_KEY = process.env.YANDEX_CLOUD_API_KEY;
@@ -669,9 +676,15 @@ const server = http.createServer(async (req, res) => {
       const { sheets } = parseBrandSpec(new Uint8Array(files.xlsx));
       const mediaSigns = await extractFabrikaSigns(files.xlsx);
       const zip = await JSZip.loadAsync(files.zip);
-      const pdfEntries = Object.values(zip.files).filter(
-        (e) => !e.dir && /\.pdf$/i.test(e.name)
-      );
+      const pdfEntries = Object.values(zip.files).filter((e) => {
+        if (e.dir) return false;
+        if (!/\.pdf$/i.test(e.name)) return false;
+        // macOS Finder zips add __MACOSX/._name.pdf metadata files — skip them
+        if (e.name.startsWith('__MACOSX/') || e.name.includes('/__MACOSX/')) return false;
+        const base = e.name.split('/').pop() || '';
+        if (base.startsWith('._')) return false;
+        return true;
+      });
       if (pdfEntries.length === 0) return sendJSON(res, 400, { error: 'в ZIP нет PDF' });
 
       const pdfNames = pdfEntries.map((e) => e.name);
