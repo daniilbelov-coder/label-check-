@@ -41,12 +41,12 @@ export function UploadPanel({ onSubmit, disabled }: Props) {
       </div>
 
       <details open={advancedOpen} onToggle={(e) => setAdvancedOpen((e.target as HTMLDetailsElement).open)}>
-        <summary className="cursor-pointer select-none text-sm text-neutral-600">Advanced</summary>
+        <summary className="cursor-pointer select-none text-sm text-slate-600 dark:text-slate-400">Advanced</summary>
         <div className="mt-3 space-y-3">
           <label className="block text-sm">
             Модель
             <select
-              className="mt-1 block w-full rounded border p-2"
+              className="mt-1 block w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-2"
               value={settings.modelId || VISION_MODELS[0].id}
               onChange={(e) => update({ modelId: e.target.value })}
             >
@@ -71,7 +71,7 @@ export function UploadPanel({ onSubmit, disabled }: Props) {
 
           <button
             type="button"
-            className="text-xs text-neutral-500 underline"
+            className="text-xs text-slate-500 dark:text-slate-400 underline"
             onClick={() => { resetSettings(); setSettings({}); }}
           >Сбросить все override'ы</button>
         </div>
@@ -80,7 +80,7 @@ export function UploadPanel({ onSubmit, disabled }: Props) {
       <button
         type="button"
         disabled={!canSubmit}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+        className="rounded bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-4 py-2 disabled:opacity-50"
         onClick={() => xlsx && zip && onSubmit(xlsx, zip, settings)}
       >Запустить проверку</button>
     </div>
@@ -91,9 +91,9 @@ function Dropzone({ label, accept, file, onFile }: {
   label: string; accept: string; file: File | null; onFile: (f: File) => void;
 }) {
   return (
-    <label className="block cursor-pointer rounded border-2 border-dashed p-6 text-center hover:bg-neutral-50">
+    <label className="block cursor-pointer rounded border-2 border-dashed border-slate-300 dark:border-slate-700 p-6 text-center hover:bg-slate-50 dark:hover:bg-slate-800/50">
       <div className="text-sm font-medium">{label}</div>
-      <div className="text-xs text-neutral-500">{file?.name || 'выберите файл'}</div>
+      <div className="text-xs text-slate-500 dark:text-slate-400">{file?.name || 'выберите файл'}</div>
       <input
         type="file" accept={accept} className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
@@ -112,12 +112,12 @@ function PromptField({ label, value, defaultValue, onChange, onReset }: {
       <div className="flex items-center justify-between">
         <span className="text-sm">{label}</span>
         {isOverridden && (
-          <button type="button" className="text-xs text-blue-600 underline" onClick={onReset}>Reset to default</button>
+          <button type="button" className="text-xs text-blue-600 dark:text-blue-400 underline" onClick={onReset}>Reset to default</button>
         )}
       </div>
       <textarea
         rows={6}
-        className="mt-1 w-full rounded border p-2 font-mono text-xs"
+        className="mt-1 w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-2 font-mono text-xs"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

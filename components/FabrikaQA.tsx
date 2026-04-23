@@ -50,10 +50,10 @@ export default function FabrikaQA(_props: { onBack?: () => void }) {
       <header className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Fabrika QA — batch</h1>
         {stage !== 'upload' && (
-          <button className="text-sm text-neutral-600 underline" onClick={reset}>Новый батч</button>
+          <button className="text-sm text-slate-600 dark:text-slate-400 underline" onClick={reset}>Новый батч</button>
         )}
       </header>
-      {error && <div className="rounded bg-red-100 p-2 text-sm text-red-700">{error}</div>}
+      {error && <div className="rounded bg-red-100 dark:bg-red-900/30 p-2 text-sm text-red-700 dark:text-red-300">{error}</div>}
       {stage === 'upload' && <UploadPanel onSubmit={handleSubmit} />}
       {(stage === 'running' || stage === 'done') && job && (
         <>
@@ -71,12 +71,12 @@ function ProgressHeader({ job }: { job: FabrikaJob }) {
   const pct = job.totalPdfs ? Math.round((job.completedPdfs / job.totalPdfs) * 100) : 0;
   return (
     <div>
-      <div className="mb-1 flex justify-between text-xs text-neutral-600">
+      <div className="mb-1 flex justify-between text-xs text-slate-600 dark:text-slate-400">
         <span>{job.completedPdfs} / {job.totalPdfs} PDF</span>
         <span>ошибок: {job.errorCount}</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded bg-neutral-200">
-        <div className="h-full bg-black transition-all" style={{ width: `${pct}%` }} />
+      <div className="h-2 w-full overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+        <div className="h-full bg-slate-900 dark:bg-slate-100 transition-all" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
