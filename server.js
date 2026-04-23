@@ -31,16 +31,28 @@ const fabrikaJobAssets = new Map(); // jobId -> { pdfBuffers, signs }
 
 function parseFabrikaMultipart(req) {
   return new Promise((resolve, reject) => {
-    const bb = busboy({ headers: req.headers, limits: { fileSize: 200 * 1024 * 1024 } });
+    const bb = busboy({ headers: req.headers, limits: { fileSize: 500 * 1024 * 1024 } });
     const files = {};
     const fields = {};
-    bb.on('file', (name, stream) => {
-      const chunks = [];
-      stream.on('data', (c) => chunks.push(c));
-      stream.on('end', () => { files[name] = Buffer.concat(chunks); });
+    const pending = [];
+    let truncated = null;
+    bb.on('file', (name, stream, info) => {
+      pending.push(new Promise((res, rej) => {
+        const chunks = [];
+        stream.on('data', (c) => chunks.push(c));
+        stream.on('limit', () => { truncated = `${name} (${info?.filename ?? ''}) exceeds size limit`; });
+        stream.on('end', () => { files[name] = Buffer.concat(chunks); res(); });
+        stream.on('error', rej);
+      }));
     });
     bb.on('field', (name, val) => { fields[name] = val; });
-    bb.on('finish', () => resolve({ files, fields }));
+    bb.on('close', async () => {
+      try {
+        await Promise.all(pending);
+        if (truncated) return reject(new Error(truncated));
+        resolve({ files, fields });
+      } catch (err) { reject(err); }
+    });
     bb.on('error', reject);
     req.pipe(bb);
   });
