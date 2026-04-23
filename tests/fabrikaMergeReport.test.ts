@@ -5,6 +5,7 @@ describe('parseSignRaw', () => {
   it('parses a clean JSON payload', () => {
     const raw = '{"found": true, "confidence": "high", "location": "стр. 2", "notes": null}';
     expect(parseSignRaw(raw)).toEqual({
+      signName: null,
       found: true,
       confidence: 'high',
       location: 'стр. 2',
@@ -12,9 +13,15 @@ describe('parseSignRaw', () => {
     });
   });
 
+  it('parses signName when model returns it', () => {
+    const raw = '{"signName": "знак EAC", "found": true, "confidence": "high", "location": "стр. 1", "notes": null}';
+    expect(parseSignRaw(raw).signName).toBe('знак EAC');
+  });
+
   it('parses JSON wrapped in markdown code fence', () => {
     const raw = '```json\n{"found": false, "confidence": "medium", "location": null, "notes": "не видно"}\n```';
     expect(parseSignRaw(raw)).toEqual({
+      signName: null,
       found: false,
       confidence: 'medium',
       location: null,
@@ -46,6 +53,15 @@ describe('fabrikaMergeReport', () => {
     expect(merged).toContain('❌ image6.png');
     expect(merged).toContain('стр. 1');
     expect(merged).toContain('не найден');
+  });
+
+  it('prefers signName over the raw filename when present', () => {
+    const signs = [
+      { name: 'image4.png', raw: '{"signName": "знак EAC", "found": true, "confidence": "high", "location": "стр. 1", "notes": null}' },
+    ];
+    const merged = fabrikaMergeReport('# Отчёт', signs);
+    expect(merged).toContain('✅ знак EAC');
+    expect(merged).not.toMatch(/✅ image4\.png/);
   });
 
   it('uses the warning marker for low confidence', () => {

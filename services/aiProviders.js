@@ -24,20 +24,15 @@ class ReplicateProvider extends AIProvider {
       });
       const prediction = await response.json();
 
-      // Log status changes
-      if (prediction.status !== lastStatus) {
-        console.log(`[Replicate] Prediction ${predictionId} status: ${prediction.status}`);
+      if (process.env.FABRIKA_DEBUG && prediction.status !== lastStatus) {
+        console.log(`[Replicate] ${predictionId} → ${prediction.status}`);
         lastStatus = prediction.status;
       }
 
       if (prediction.status === 'succeeded') {
-        console.log(`[Replicate] Prediction completed. Output type: ${typeof prediction.output}, Is array: ${Array.isArray(prediction.output)}`);
-        if (Array.isArray(prediction.output)) {
-          console.log(`[Replicate] Array length: ${prediction.output.length}`);
-        }
         return prediction.output;
       } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
-        console.error(`[Replicate] Prediction failed/canceled:`, prediction.error);
+        console.error(`[Replicate] ${predictionId} ${prediction.status}:`, prediction.error);
         throw new Error(prediction.error || 'Prediction failed');
       }
 
@@ -121,60 +116,89 @@ class ReplicateProvider extends AIProvider {
       ? { version: versionId, input }  // Community: use version hash
       : { version: modelName, input };  // Official: use model name string
 
-    // Debug: Log the actual request being sent
-    console.log('=== REPLICATE REQUEST DEBUG ===');
-    console.log('Model:', this.modelConfig.displayName);
-    console.log('API Body:', JSON.stringify(requestBody, null, 2));
-    console.log('=== END REQUEST DEBUG ===');
+    if (process.env.FABRIKA_DEBUG) {
+      console.log(`[Replicate] → ${this.modelConfig.id}, ${(input.images || input.image_input || []).length} images`);
+    }
 
-    const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const MAX_429_RETRIES = 6;
+    const MAX_PREDICTION_RETRIES = 2; // on transient Replicate side errors (E87xx, Director)
 
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      let msg = errorText;
-      try {
-        const ej = JSON.parse(errorText);
-        msg = ej.detail || ej.error || errorText;
-      } catch (_) {
-        /* keep raw */
+    const isTransientPredictionError = (msg) => {
+      const s = String(msg || '').toLowerCase();
+      return (
+        s.includes('e87') ||
+        s.includes('director') ||
+        s.includes('handling prediction') ||
+        s.includes('internal') ||
+        s.includes('timeout') ||
+        s.includes('temporarily') ||
+        s.includes('unavailable')
+      );
+    };
+
+    let output;
+    let predictionAttempt = 0;
+    // outer loop handles transient prediction failures (E8765 etc.)
+    while (true) {
+      let createResponse;
+      for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+        createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+        if (createResponse.status !== 429 || attempt === MAX_429_RETRIES) break;
+        const hdr = createResponse.headers.get('retry-after');
+        const waitMs = hdr
+          ? Math.max(1, parseFloat(hdr)) * 1000
+          : Math.min(30000, 2000 * Math.pow(2, attempt));
+        console.warn(
+          `[Replicate] 429 throttled, retrying in ${Math.round(waitMs / 1000)}s (attempt ${attempt + 1}/${MAX_429_RETRIES})`
+        );
+        await new Promise((r) => setTimeout(r, waitMs));
       }
-      throw new Error(
-        `Replicate API Error (${this.modelConfig.id}): HTTP ${createResponse.status} - ${msg}`
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        let msg = errorText;
+        try {
+          const ej = JSON.parse(errorText);
+          msg = ej.detail || ej.error || errorText;
+        } catch (_) { /* keep raw */ }
+        throw new Error(
+          `Replicate API Error (${this.modelConfig.id}): HTTP ${createResponse.status} - ${msg}`
+        );
+      }
+
+      const prediction = await createResponse.json();
+      try {
+        output = await this.waitForPrediction(prediction.id);
+        break; // success
+      } catch (err) {
+        if (predictionAttempt >= MAX_PREDICTION_RETRIES || !isTransientPredictionError(err.message)) {
+          throw err;
+        }
+        predictionAttempt++;
+        const waitMs = 2000 * Math.pow(2, predictionAttempt - 1);
+        console.warn(
+          `[Replicate] transient prediction error (${err.message}); retrying in ${waitMs / 1000}s (${predictionAttempt}/${MAX_PREDICTION_RETRIES})`
+        );
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+    }
+
+    // Opt-in debug dump: set FABRIKA_DEBUG=1 to enable verbose per-call logs.
+    if (process.env.FABRIKA_DEBUG) {
+      const len = Array.isArray(output)
+        ? output.reduce((n, s) => n + String(s).length, 0)
+        : String(output).length;
+      console.log(
+        `[Replicate] ${this.modelConfig.id} → ${Array.isArray(output) ? 'array' : typeof output}, ${len} chars`
       );
     }
-
-    const prediction = await createResponse.json();
-    const output = await this.waitForPrediction(prediction.id);
-
-    // Debug logging - ALWAYS log for debugging
-    console.log('=== REPLICATE OUTPUT DEBUG ===');
-    console.log('Model:', this.modelConfig.displayName);
-    console.log('Version:', this.modelConfig.versionId || this.modelConfig.modelName);
-    console.log('Output type:', typeof output);
-    console.log('Is array:', Array.isArray(output));
-
-    if (Array.isArray(output)) {
-      console.log('Array length:', output.length);
-      output.forEach((item, idx) => {
-        console.log(`  [${idx}] type: ${typeof item}, length: ${String(item).length}`);
-        console.log(`  [${idx}] first 100 chars:`, String(item).substring(0, 100));
-      });
-      const joined = output.map(item => String(item)).join('');
-      console.log('Total joined length:', joined.length);
-      console.log('Joined first 200 chars:', joined.substring(0, 200));
-      console.log('Joined last 200 chars:', joined.substring(Math.max(0, joined.length - 200)));
-    } else {
-      console.log('Output length:', String(output).length);
-      console.log('Output sample:', String(output).substring(0, 200));
-    }
-    console.log('=== END DEBUG ===');
 
     // Handle structured output from GPT-5
     if (supportsJsonSchema && briefType) {

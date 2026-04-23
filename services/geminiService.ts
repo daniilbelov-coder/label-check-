@@ -2,7 +2,7 @@
 // Все промпты перенесены на backend (services/prompts.js) для защиты коммерческих секретов
 // Клиент больше не отправляет промпты на сервер
 
-import type { BriefType, FabrikaAnalyzeRequest, FabrikaAnalyzeResponse } from '../types';
+import type { BriefType } from '../types';
 
 // Получаем API ключ из localStorage (после входа) или из .env (для разработки)
 function getApiSecret(): string {
@@ -182,20 +182,3 @@ export const savePrompts = async (prompts: Record<string, string>): Promise<{ su
   return data;
 };
 
-// --- SERVICE 7: FABRIKA MACKET QA ---
-export const analyzeFabrikaMacket = async (
-  payload: FabrikaAnalyzeRequest
-): Promise<FabrikaAnalyzeResponse> => {
-  const response = await fetchWithAuth('/api/fabrika/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || `HTTP ${response.status}`);
-  }
-
-  return response.json();
-};

@@ -37,13 +37,8 @@ const BrandSelector: React.FC<Props> = ({ onSelectLavka, onSelectFabrika }) => {
       {/* ── Фабрика ── */}
       <button
         onClick={onSelectFabrika}
-        className="group relative bg-white dark:bg-slate-900 p-12 rounded-[40px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 hover:shadow-2xl hover:ring-slate-200 dark:hover:ring-slate-700 transition-all text-left flex flex-col h-full min-h-[380px] overflow-hidden"
+        className="group bg-white dark:bg-slate-900 p-12 rounded-[40px] shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 hover:shadow-2xl hover:ring-brand-100 dark:hover:ring-brand-900 transition-all text-left flex flex-col h-full min-h-[380px]"
       >
-        {/* Бейдж */}
-        <div className="absolute top-6 right-6 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold px-3 py-1.5 rounded-full tracking-wide">
-          СКОРО
-        </div>
-
         <div className="mb-8 h-10 flex items-center">
           {/* Белая подложка в dark mode — у логотипа тёмный текст + цветной иконка */}
           <div className="dark:bg-white dark:rounded-lg dark:px-2 dark:py-1.5">
@@ -59,9 +54,9 @@ const BrandSelector: React.FC<Props> = ({ onSelectLavka, onSelectFabrika }) => {
           Фабрика
         </h3>
         <p className="text-slate-500 dark:text-slate-400 text-[15px] leading-relaxed mb-8 flex-grow">
-          Новые инструменты для производства. Находится в активной разработке.
+          Batch-проверка PDF-макетов упаковки по бренд-спеке XLSX: сверка текста и знаков манипуляции.
         </p>
-        <div className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-600 font-bold text-sm tracking-wide group-hover:gap-2 transition-all">
+        <div className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 font-bold text-sm tracking-wide group-hover:gap-2 transition-all">
           ОТКРЫТЬ <ChevronRight size={16} />
         </div>
       </button>
