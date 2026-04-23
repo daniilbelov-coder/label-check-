@@ -23,34 +23,40 @@ export function parseBrandSpec(bufferLike) {
     if (!ws['!ref']) return { name, skipped: true, columns: [] };
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-    const filenameRowIdx = rows.findIndex(
-      (r) => normalizeLabel(r[0]) === FILENAME_ROW_MARKER
-    );
-    if (filenameRowIdx < 0) return { name, skipped: true, columns: [] };
+    // Each "Название файла" row terminates a section. A sheet can have 1..N
+    // such rows — one per packaging type (RL/GB/TB). Each (section, column)
+    // pair produces one PDF spec.
+    const filenameRowIdxs = rows
+      .map((r, i) => (normalizeLabel(r[0]) === FILENAME_ROW_MARKER ? i : -1))
+      .filter((i) => i >= 0);
+    if (filenameRowIdxs.length === 0) return { name, skipped: true, columns: [] };
 
-    const filenameRow = rows[filenameRowIdx];
     const maxCol = Math.max(...rows.map((r) => r.length)) - 1;
     const columns = [];
 
-    // Skip col A (labels) and col B (templates). Start from index 2.
-    for (let c = 2; c <= maxCol; c++) {
-      const fileName = String(filenameRow[c] ?? '').trim();
-      if (!fileName) continue;
-      const attrs = [];
-      for (let r = 0; r < rows.length; r++) {
-        if (r === filenameRowIdx) continue;
-        const label = String(rows[r][0] ?? '').trim();
-        const value = String(rows[r][c] ?? '').trim();
-        if (!label || !value) continue;
-        attrs.push({ label, value });
+    let sectionStart = 0;
+    for (const fnRowIdx of filenameRowIdxs) {
+      const filenameRow = rows[fnRowIdx];
+      // Section attrs live in [sectionStart .. fnRowIdx - 1].
+      for (let c = 2; c <= maxCol; c++) {
+        const fileName = String(filenameRow[c] ?? '').trim();
+        if (!fileName) continue;
+        const attrs = [];
+        for (let r = sectionStart; r < fnRowIdx; r++) {
+          const label = String(rows[r][0] ?? '').trim();
+          const value = String(rows[r][c] ?? '').trim();
+          if (!label || !value) continue;
+          attrs.push({ label, value });
+        }
+        columns.push({
+          sheet: name,
+          colIndex: c,
+          fileName,
+          fileNameNormalized: normalizeFileName(fileName),
+          attrs,
+        });
       }
-      columns.push({
-        sheet: name,
-        colIndex: c,
-        fileName,
-        fileNameNormalized: normalizeFileName(fileName),
-        attrs,
-      });
+      sectionStart = fnRowIdx + 1;
     }
     return { name, skipped: false, columns };
   });

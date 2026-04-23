@@ -67,6 +67,30 @@ describe('parseBrandSpec', () => {
     expect(result.sheets[0].columns).toHaveLength(1);
     expect(result.sheets[0].columns[0].fileName).toBe('Tuvio A RL-01');
   });
+
+  it('emits one column per (section, model) when sheet has multiple Название файла rows', () => {
+    const buf = makeWorkbook('Пылесосы', [
+      ['Мощность', '___ Вт', '350 Вт', '650 Вт'],
+      ['Название файла', 'RL tmpl', 'Tuvio Vacuum TVC08S RL-01', 'Tuvio Vacuum TVC13S RL-01'],
+      ['Страна', 'Сделано в Китае', 'Сделано в Китае', 'Сделано в Китае'],
+      ['Название файла', 'GB tmpl', 'Tuvio Vacuum TVC08S GB-01', 'Tuvio Vacuum TVC13S GB-01'],
+      ['Вес', '___ кг', '3 кг', '4 кг'],
+      ['Название файла', 'TB tmpl', 'Tuvio Vacuum TVC08S TB-01', 'Tuvio Vacuum TVC13S TB-01'],
+    ]);
+    const result = parseBrandSpec(new Uint8Array(buf));
+    const cols = result.sheets[0].columns;
+    expect(cols).toHaveLength(6);
+    const byName = new Map(cols.map((c) => [c.fileName, c]));
+    expect(byName.get('Tuvio Vacuum TVC08S RL-01')?.attrs).toEqual([
+      { label: 'Мощность', value: '350 Вт' },
+    ]);
+    expect(byName.get('Tuvio Vacuum TVC08S GB-01')?.attrs).toEqual([
+      { label: 'Страна', value: 'Сделано в Китае' },
+    ]);
+    expect(byName.get('Tuvio Vacuum TVC08S TB-01')?.attrs).toEqual([
+      { label: 'Вес', value: '3 кг' },
+    ]);
+  });
 });
 
 describe('matchPdfsToColumns', () => {
