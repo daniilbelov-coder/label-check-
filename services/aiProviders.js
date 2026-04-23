@@ -24,20 +24,15 @@ class ReplicateProvider extends AIProvider {
       });
       const prediction = await response.json();
 
-      // Log status changes
-      if (prediction.status !== lastStatus) {
-        console.log(`[Replicate] Prediction ${predictionId} status: ${prediction.status}`);
+      if (process.env.FABRIKA_DEBUG && prediction.status !== lastStatus) {
+        console.log(`[Replicate] ${predictionId} → ${prediction.status}`);
         lastStatus = prediction.status;
       }
 
       if (prediction.status === 'succeeded') {
-        console.log(`[Replicate] Prediction completed. Output type: ${typeof prediction.output}, Is array: ${Array.isArray(prediction.output)}`);
-        if (Array.isArray(prediction.output)) {
-          console.log(`[Replicate] Array length: ${prediction.output.length}`);
-        }
         return prediction.output;
       } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
-        console.error(`[Replicate] Prediction failed/canceled:`, prediction.error);
+        console.error(`[Replicate] ${predictionId} ${prediction.status}:`, prediction.error);
         throw new Error(prediction.error || 'Prediction failed');
       }
 
@@ -121,11 +116,9 @@ class ReplicateProvider extends AIProvider {
       ? { version: versionId, input }  // Community: use version hash
       : { version: modelName, input };  // Official: use model name string
 
-    // Debug: Log the actual request being sent
-    console.log('=== REPLICATE REQUEST DEBUG ===');
-    console.log('Model:', this.modelConfig.displayName);
-    console.log('API Body:', JSON.stringify(requestBody, null, 2));
-    console.log('=== END REQUEST DEBUG ===');
+    if (process.env.FABRIKA_DEBUG) {
+      console.log(`[Replicate] → ${this.modelConfig.id}, ${(input.images || input.image_input || []).length} images`);
+    }
 
     const MAX_429_RETRIES = 6;
     let createResponse;
