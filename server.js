@@ -2,10 +2,11 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createAIProvider } from './services/aiProviders.js';
 import { DEFAULT_MODEL, ALL_MODELS } from './config/modelConfig.js';
 import { COMPARISON_SYSTEM_PROMPT, BRIEF_PROMPTS, FINAL_CHECK_SYSTEM_PROMPT, TEXT_CHECK_SYSTEM_PROMPT, savePrompts, reloadPrompts, getPromptsETag, getPromptsMetadata } from './services/prompts.js';
 import { FABRIKA_QA_SYSTEM_PROMPT, FABRIKA_SIGN_CHECK_PROMPT } from './services/fabrikaPrompts.js';
+import { callAI } from './services/callAI.js';
+import { fabrikaMergeReport as mergeFabrikaReport } from './utils/fabrikaMergeReport.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,17 +34,6 @@ const mimeTypes = {
   '.woff2': 'font/woff2',
   '.map': 'application/json',
 };
-
-// Unified AI call helper
-async function callAI({ prompt, systemPrompt, images = [], modelId = DEFAULT_MODEL, briefType = null }) {
-  const provider = createAIProvider(modelId, {
-    replicateApiKey: REPLICATE_API_KEY,
-    yandexApiKey: YANDEX_API_KEY,
-    yandexFolderId: YANDEX_FOLDER_ID
-  });
-
-  return await provider.generateText({ prompt, systemPrompt, images, briefType });
-}
 
 // Parse request body
 function parseBody(req) {
@@ -219,42 +209,6 @@ function validateFabrikaInput(body) {
   }
 
   return { valid: true };
-}
-
-function parseSignRawJson(raw) {
-  const fence = String(raw).match(/```json\s*([\s\S]*?)\s*```/);
-  const obj = String(raw).match(/\{[\s\S]*\}/);
-  const candidate = fence ? fence[1] : obj ? obj[0] : null;
-  if (!candidate) {
-    return { found: false, confidence: 'low', location: null, notes: `Не распарсили: ${String(raw).slice(0, 200)}` };
-  }
-  try {
-    const parsed = JSON.parse(candidate);
-    const c = ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'low';
-    return {
-      found: Boolean(parsed.found),
-      confidence: c,
-      location: parsed.location ?? null,
-      notes: parsed.notes ?? null,
-    };
-  } catch {
-    return { found: false, confidence: 'low', location: null, notes: `JSON.parse fail: ${String(raw).slice(0, 200)}` };
-  }
-}
-
-function mergeFabrikaReport(mainMd, signResults) {
-  if (!signResults || signResults.length === 0) return mainMd;
-  const lines = signResults.map(({ name, raw }) => {
-    const r = parseSignRawJson(raw);
-    const marker = !r.found ? '❌' : r.confidence === 'low' ? '⚠️' : '✅';
-    const base = r.found ? (r.location ? `найден (${r.location})` : 'найден') : 'не найден';
-    const tailParts = [];
-    if (r.confidence === 'low') tailParts.push(`confidence: ${r.confidence}`);
-    if (r.notes) tailParts.push(r.notes);
-    const tail = tailParts.length ? ' — ' + tailParts.join(' — ') : '';
-    return `- ${marker} ${name} — ${base}${tail}`;
-  });
-  return `${mainMd.trimEnd()}\n\n## Знаки манипуляции (детальная сверка)\n\n${lines.join('\n')}\n`;
 }
 
 const server = http.createServer(async (req, res) => {
