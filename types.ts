@@ -59,3 +59,47 @@ export interface FabrikaAnalyzeResponse {
   signResults: FabrikaSignResult[];
   mainMd: string;
 }
+
+// ===== Fabrika batch QA (new) =====
+
+export type FabrikaRowStatus = 'pending' | 'analyzing' | 'done' | 'error' | 'no-spec';
+
+export interface FabrikaMatchedColumn {
+  sheet: string;
+  colIndex: number;
+  fileName: string;
+}
+
+export interface FabrikaRow {
+  id: string;
+  pdfName: string;
+  status: FabrikaRowStatus;
+  matchedColumn: FabrikaMatchedColumn | null;
+  specText: string | null;
+  mainMd: string | null;
+  signResults: Array<{ name: string; raw: string; error: string | null }> | null;
+  error: string | null;
+  durationMs: number | null;
+}
+
+export interface FabrikaJob {
+  id: string;
+  status: 'parsing' | 'running' | 'done' | 'error';
+  createdAt: number;
+  totalPdfs: number;
+  completedPdfs: number;
+  errorCount: number;
+  rows: FabrikaRow[];
+  unmatchedColumns: Array<{ sheet: string; fileName: string }>;
+}
+
+export interface FabrikaJobSettings {
+  modelId?: string;
+  qaSystemPrompt?: string;
+  signCheckPrompt?: string;
+}
+
+export interface FabrikaPromptDefaults {
+  qaSystemPrompt: string;
+  signCheckPrompt: string;
+}
