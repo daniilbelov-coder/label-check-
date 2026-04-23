@@ -70,8 +70,8 @@ export default function FabrikaQA({ onBack }: { onBack?: () => void }) {
           Фабрика QA — пакетная проверка
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-center max-w-2xl leading-relaxed">
-          Загрузите XLSX со спекой бренда и ZIP-архив с PDF-макетами.<br />
-          ИИ проверит каждый макет по 11 категориям и выявит все расхождения.
+          Загрузите XLSX со спецификацией товаров и ZIP-архив с PDF-макетами.<br />
+          ИИ проверит каждый макет и выявит расхождения.
         </p>
       </div>
 

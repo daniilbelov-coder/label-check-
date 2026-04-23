@@ -23,6 +23,7 @@ export interface DragDropProps {
   onClear: () => void;
   title: string;
   description: string;
+  emptyHeading?: string;
 }
 
 export type AppView =

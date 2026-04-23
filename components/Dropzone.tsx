@@ -2,14 +2,15 @@ import React, { useRef, useState } from 'react';
 import { Upload, X, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { DragDropProps } from '../types';
 
-const Dropzone: React.FC<DragDropProps> = ({ 
-  type, 
-  accept, 
-  fileData, 
-  onFileSelect, 
-  onClear, 
-  title, 
-  description 
+const Dropzone: React.FC<DragDropProps> = ({
+  type,
+  accept,
+  fileData,
+  onFileSelect,
+  onClear,
+  title,
+  description,
+  emptyHeading,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -180,7 +181,7 @@ const Dropzone: React.FC<DragDropProps> = ({
               {type === 'label' ? <Upload size={28} /> : <FileSpreadsheet size={28} />}
             </div>
             <p className="text-base font-semibold text-slate-900 dark:text-white mb-2">
-              {type === 'label' ? 'Загрузите этикетку' : 'Загрузите таблицу'}
+              {emptyHeading ?? (type === 'label' ? 'Загрузите этикетку' : 'Загрузите таблицу')}
             </p>
             <p className="text-sm text-slate-400 dark:text-slate-500 max-w-[200px] leading-relaxed">
               {description}

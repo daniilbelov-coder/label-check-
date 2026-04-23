@@ -40,32 +40,8 @@ export function UploadPanel({ onSubmit, disabled }: Props) {
   return (
     <div className="space-y-6">
 
-      {/* Dropzones */}
-      <div className="w-full grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-        <Dropzone
-          type="excel"
-          accept=".xlsx"
-          fileData={xlsxFileData}
-          onFileSelect={setXlsx}
-          onClear={() => setXlsx(null)}
-          title="1. XLSX СО СПЕКОЙ БРЕНДА"
-          description="Перетащите файл .xlsx сюда"
-        />
-        <Dropzone
-          type="excel"
-          accept=".zip"
-          fileData={zipFileData}
-          onFileSelect={setZip}
-          onClear={() => setZip(null)}
-          title="2. ZIP С PDF-МАКЕТАМИ"
-          description="Перетащите архив .zip с PDF-файлами"
-        />
-      </div>
-
-      {/* Settings row */}
-      <div className="max-w-5xl mx-auto space-y-3">
-
-        {/* Model selector */}
+      {/* Model selector — above dropzones */}
+      <div className="max-w-5xl mx-auto">
         <div className="glass-card rounded-2xl p-1">
           <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4">
             <div className="flex items-center gap-3 mb-3">
@@ -87,8 +63,33 @@ export function UploadPanel({ onSubmit, disabled }: Props) {
             </select>
           </div>
         </div>
+      </div>
 
-        {/* Prompts (collapsible) */}
+      {/* Dropzones */}
+      <div className="w-full grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+        <Dropzone
+          type="excel"
+          accept=".xlsx"
+          fileData={xlsxFileData}
+          onFileSelect={setXlsx}
+          onClear={() => setXlsx(null)}
+          title="1. XLSX СО СПЕКОЙ БРЕНДА"
+          description="Перетащите файл .xlsx сюда"
+        />
+        <Dropzone
+          type="excel"
+          accept=".zip"
+          fileData={zipFileData}
+          onFileSelect={setZip}
+          onClear={() => setZip(null)}
+          title="2. ZIP С PDF-МАКЕТАМИ"
+          description="Перетащите архив .zip с PDF-файлами"
+          emptyHeading="Загрузите упаковки"
+        />
+      </div>
+
+      {/* Prompts (collapsible) */}
+      <div className="max-w-5xl mx-auto">
         <div className="glass-card rounded-2xl p-1">
           <div className="bg-white dark:bg-slate-900 rounded-[20px] overflow-hidden">
             <button
