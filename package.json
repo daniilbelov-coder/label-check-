@@ -16,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.99",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "jszip": "^3.10.1",
