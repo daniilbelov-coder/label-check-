@@ -11,9 +11,8 @@ const ROW_CONCURRENCY = Number(process.env.FABRIKA_ROW_CONCURRENCY) || 1;
  * @param {object} store         fabrikaJobStore instance
  * @param {string} jobId
  * @param {Map<string, Buffer>} pdfBuffers   pdfName -> buffer
- * @param {Array<{name: string, dataUrl: string}>} signs
  */
-export function runJob(store, jobId, pdfBuffers, signs) {
+export function runJob(store, jobId, pdfBuffers) {
   const job = store.get(jobId);
   if (!job) return;
   const queue = job.rows.filter((r) => r.status === 'pending').map((r) => r.id);
@@ -36,7 +35,7 @@ export function runJob(store, jobId, pdfBuffers, signs) {
         const { signResults, merged } = await analyzePdfRow({
           pdfBuffer: buf,
           column,
-          signs,
+          signs: column?.signs || [],
           settings: current.settings || {},
         });
         store.updateRow(jobId, rowId, {
@@ -75,7 +74,7 @@ function restoreColumn(row, job) {
 /**
  * Reset a row to `pending` and relaunch the worker pool.
  */
-export async function retryRow(store, jobId, rowId, pdfBuffers, signs) {
+export async function retryRow(store, jobId, rowId, pdfBuffers) {
   const job = store.get(jobId);
   if (!job) throw new Error('job not found');
   const row = job.rows.find((r) => r.id === rowId);
@@ -88,5 +87,5 @@ export async function retryRow(store, jobId, rowId, pdfBuffers, signs) {
     signResults: null,
     durationMs: null,
   });
-  runJob(store, jobId, pdfBuffers, signs);
+  runJob(store, jobId, pdfBuffers);
 }

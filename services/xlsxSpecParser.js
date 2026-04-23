@@ -54,6 +54,8 @@ export function parseBrandSpec(bufferLike) {
           fileName,
           fileNameNormalized: normalizeFileName(fileName),
           attrs,
+          sectionRowStart: sectionStart,  // inclusive, 0-indexed
+          sectionRowEnd: fnRowIdx,        // exclusive, 0-indexed
         });
       }
       sectionStart = fnRowIdx + 1;
@@ -62,6 +64,32 @@ export function parseBrandSpec(bufferLike) {
   });
 
   return { sheets };
+}
+
+/**
+ * Attach signs (sign images placed in the spec cells) to each column
+ * using per-cell anchor data. Each column gets only the signs whose
+ * anchor falls within (col.colIndex, sectionRowStart..sectionRowEnd).
+ *
+ * @param {Array} sheets  output of parseBrandSpec().sheets
+ * @param {Map<string, Array<{col, row, imageName, dataUrl}>>} signAnchors
+ */
+export function attachSignsToColumns(sheets, signAnchors) {
+  for (const sheet of sheets) {
+    const anchors = signAnchors.get(sheet.name) || [];
+    for (const col of sheet.columns) {
+      const seen = new Set();
+      const signs = [];
+      for (const a of anchors) {
+        if (a.col !== col.colIndex) continue;
+        if (a.row < col.sectionRowStart || a.row >= col.sectionRowEnd) continue;
+        if (seen.has(a.imageName)) continue;
+        seen.add(a.imageName);
+        signs.push({ name: a.imageName, dataUrl: a.dataUrl });
+      }
+      col.signs = signs;
+    }
+  }
 }
 
 export function matchPdfsToColumns(pdfNames, sheets) {

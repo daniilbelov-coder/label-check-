@@ -12,8 +12,8 @@ import busboy from 'busboy';
 import JSZip from 'jszip';
 import { createJobStore } from './services/fabrikaJobStore.js';
 import { runJob, retryRow } from './services/fabrikaWorker.js';
-import { parseBrandSpec, matchPdfsToColumns, buildSpecText } from './services/xlsxSpecParser.js';
-import { extractFabrikaSigns } from './services/xlsxMedia.js';
+import { parseBrandSpec, matchPdfsToColumns, buildSpecText, attachSignsToColumns } from './services/xlsxSpecParser.js';
+import { extractSignsByCell } from './services/xlsxMedia.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,7 +35,7 @@ const API_SECRET = process.env.API_SECRET || 'dev-secret-change-me';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 const fabrikaJobStore = createJobStore();
-const fabrikaJobAssets = new Map(); // jobId -> { pdfBuffers, signs }
+const fabrikaJobAssets = new Map(); // jobId -> { pdfBuffers }
 
 function parseFabrikaMultipart(req) {
   return new Promise((resolve, reject) => {
@@ -675,7 +675,8 @@ const server = http.createServer(async (req, res) => {
       }
 
       const { sheets } = parseBrandSpec(new Uint8Array(files.xlsx));
-      const mediaSigns = await extractFabrikaSigns(files.xlsx);
+      const signAnchors = await extractSignsByCell(files.xlsx);
+      attachSignsToColumns(sheets, signAnchors);
       const zip = await JSZip.loadAsync(files.zip);
       const pdfEntries = Object.values(zip.files).filter((e) => {
         if (e.dir) return false;
@@ -716,8 +717,8 @@ const server = http.createServer(async (req, res) => {
         if (pdfs[i].column) job.settings._columns[row.id] = pdfs[i].column;
       });
 
-      fabrikaJobAssets.set(job.id, { pdfBuffers, signs: mediaSigns });
-      runJob(fabrikaJobStore, job.id, pdfBuffers, mediaSigns);
+      fabrikaJobAssets.set(job.id, { pdfBuffers });
+      runJob(fabrikaJobStore, job.id, pdfBuffers);
 
       sendJSON(res, 200, {
         jobId: job.id,
@@ -789,7 +790,7 @@ const server = http.createServer(async (req, res) => {
       const assets = fabrikaJobAssets.get(m[1]);
       if (!assets) return sendJSON(res, 404, { error: 'assets для job не найдены (TTL истёк?)' });
       try {
-        await retryRow(fabrikaJobStore, m[1], m[2], assets.pdfBuffers, assets.signs);
+        await retryRow(fabrikaJobStore, m[1], m[2], assets.pdfBuffers);
         sendJSON(res, 200, { ok: true });
       } catch (err) {
         sendJSON(res, 400, { error: err.message });
