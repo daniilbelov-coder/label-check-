@@ -56,7 +56,7 @@ export function ResultsTable({ job, jobId, onRetry }: {
                   {row.matchedColumn?.sheet ?? '—'}
                 </td>
                 <td className="px-2 py-3 text-xs text-slate-500 dark:text-slate-400">
-                  {row.durationMs ? `${row.durationMs} мс` : ''}
+                  {row.durationMs ? `${(row.durationMs / 1000).toFixed(1)} с` : ''}
                 </td>
                 <td className="px-6 py-3">
                   {row.status === 'error' && (
