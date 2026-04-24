@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Download, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { FabrikaRow } from '../../types';
 import { getRowDetail } from '../../services/fabrikaClient';
@@ -153,6 +154,7 @@ export function RowDetail({
   jobId: string; rowId: string; row: FabrikaRow;
 }) {
   const [full, setFull] = useState<FabrikaRow>(row);
+  const [rawMode, setRawMode] = useState(false);
 
   useEffect(() => {
     if (row.status === 'done' && !row.mainMd) {
@@ -182,23 +184,118 @@ export function RowDetail({
   }
 
   const report = parseQAReport(full.mainMd);
-  if (!report) {
+  const signResults = full.signResults ?? [];
+  const total = report
+    ? report.criticalCount + report.significantCount + report.minorCount
+    : 0;
+  const isApproved = report ? /допустить|принято|approved/i.test(report.verdict) : false;
+
+  // View toggle — shown at the top of every expanded row
+  const ViewToggle = () => (
+    <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 self-start">
+      <button
+        onClick={() => setRawMode(false)}
+        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+          !rawMode
+            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+        }`}
+      >
+        Структурированный
+      </button>
+      <button
+        onClick={() => setRawMode(true)}
+        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+          rawMode
+            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+        }`}
+      >
+        Исходный текст
+      </button>
+    </div>
+  );
+
+  // Raw (old) view
+  if (rawMode) {
     return (
-      <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-        {full.mainMd}
-      </pre>
+      <div className="space-y-3 py-2">
+        <ViewToggle />
+        <div className="bg-white dark:bg-slate-900 rounded-[20px] ring-1 ring-slate-100 dark:ring-slate-800 p-5">
+          <div className="prose prose-sm max-w-none dark:prose-invert
+            prose-headings:font-bold prose-headings:text-slate-800 dark:prose-headings:text-slate-200
+            prose-h2:text-[15px] prose-h2:mt-5 prose-h2:mb-2 prose-h2:first:mt-0
+            prose-p:text-slate-600 dark:prose-p:text-slate-300 prose-p:my-1 prose-p:leading-relaxed
+            prose-li:text-slate-600 dark:prose-li:text-slate-300 prose-li:my-0.5
+            prose-strong:text-slate-800 dark:prose-strong:text-slate-200
+            prose-ul:my-1 prose-ol:my-1">
+            <ReactMarkdown>{full.mainMd}</ReactMarkdown>
+          </div>
+        </div>
+        {signResults.length > 0 && (
+          <div className="bg-white dark:bg-slate-900 rounded-[20px] ring-1 ring-slate-100 dark:ring-slate-800 p-5">
+            <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">
+              Детальная сверка знаков · {signResults.length} шт.
+            </p>
+            <div className="space-y-2">
+              {signResults.map((s, i) => {
+                const p = s.error
+                  ? { found: false, confidence: 'low' as const, signName: null, location: null, notes: s.error }
+                  : parseSignRaw(s.raw);
+                const icon = !p.found ? '❌' : p.confidence === 'low' ? '⚠️' : '✅';
+                return (
+                  <div key={i} className={`flex gap-3 items-start rounded-xl p-3 ${
+                    !p.found
+                      ? 'bg-red-50 dark:bg-red-950/30 ring-1 ring-red-100 dark:ring-red-900/30'
+                      : p.confidence === 'low'
+                      ? 'bg-amber-50 dark:bg-amber-950/30 ring-1 ring-amber-100 dark:ring-amber-900/30'
+                      : 'bg-green-50 dark:bg-green-950/30 ring-1 ring-green-100 dark:ring-green-900/30'
+                  }`}>
+                    <span className="text-base leading-none mt-0.5 shrink-0">{icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        {p.signName || s.name}
+                      </div>
+                      <div className={`text-xs mt-0.5 font-medium ${
+                        !p.found ? 'text-red-600 dark:text-red-400'
+                        : p.confidence === 'low' ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {p.found ? (p.location ? `Найден — ${p.location}` : 'Найден') : 'Не найден'}
+                      </div>
+                      {p.notes && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                          {p.notes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
-  const signResults = full.signResults ?? [];
-  const total = report.criticalCount + report.significantCount + report.minorCount;
-  const isApproved = /допустить|принято|approved/i.test(report.verdict);
+  // Structured view — fallback to raw if parsing failed
+  if (!report) {
+    return (
+      <div className="space-y-3 py-2">
+        <ViewToggle />
+        <pre className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+          {full.mainMd}
+        </pre>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 py-2">
 
       {/* Section title + meta */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h3 className="text-[15px] font-bold text-slate-800 dark:text-slate-200">
             Результаты проверки
@@ -211,15 +308,18 @@ export function RowDetail({
             </p>
           )}
         </div>
-        <button
-          onClick={() => doDownload(full.mainMd!, full.pdfName)}
-          className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400
-            hover:text-slate-900 dark:hover:text-white transition-colors
-            px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800
-            hover:bg-slate-200 dark:hover:bg-slate-700 shrink-0"
-        >
-          <Download size={13} /> Скачать отчёт
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <ViewToggle />
+          <button
+            onClick={() => doDownload(full.mainMd!, full.pdfName)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400
+              hover:text-slate-900 dark:hover:text-white transition-colors
+              px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800
+              hover:bg-slate-200 dark:hover:bg-slate-700"
+          >
+            <Download size={13} /> Скачать
+          </button>
+        </div>
       </div>
 
       {/* Summary stats */}
